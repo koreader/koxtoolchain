@@ -25,7 +25,7 @@ Build_CT-NG() {
 	[ ! -d ${BUILD_ROOT} ] && mkdir -p ${BUILD_ROOT}
 	pushd ${BUILD_ROOT}
 		if [ ! -d CT-NG ]; then
-			git clone git@github.com:crosstool-ng/crosstool-ng.git CT-NG
+			git clone https://github.com/crosstool-ng/crosstool-ng.git CT-NG
 		fi
 		pushd CT-NG
 			git fetch
