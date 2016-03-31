@@ -68,11 +68,13 @@ build_kobo_ct() {
 	CUSTOM_KERNEL_TARBALL=${BUILD_ROOT}/downloads/kobo-linux-2.6.35.3.tar.bz2
 	if [ ! -f ${CUSTOM_KERNEL_TARBALL} ]; then
 		echo "Fetching kernel source from Kobo github repo..."
-		curl https://raw.githubusercontent.com/kobolabs/Kobo-Reader/master/hw/imx507-aurah2o/linux-2.6.35.3.tar.bz2 \
+		curl -k https://raw.githubusercontent.com/kobolabs/Kobo-Reader/master/hw/imx507-aurah2o/linux-2.6.35.3.tar.bz2 \
 			> ${CUSTOM_KERNEL_TARBALL}
 	fi
-	if [ ! `md5sum ${CUSTOM_KERNEL_TARBALL}` = 'fc5cc4a95ca363a2a98e726151bc6933' ]; then
+	expected_md5='fc5cc4a95ca363a2a98e726151bc6933'
+	if [ `md5sum ${CUSTOM_KERNEL_TARBALL} | awk '{print $1}'` != expected_md5 ]; then
 		echo "Wrong checksum for kernel source, abort!"
+		echo "md5(${CUSTOM_KERNEL_TARBALL}) should be: ${expected_md5}"
 		exit 1
 	fi
 	[ ! -d ${BUILD_ROOT}/tmp ] && mkdir -p ${BUILD_ROOT}/tmp
