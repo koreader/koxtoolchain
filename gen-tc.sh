@@ -72,9 +72,10 @@ build_kobo_ct() {
 			> ${CUSTOM_KERNEL_TARBALL}
 	fi
 	expected_md5='fc5cc4a95ca363a2a98e726151bc6933'
-	if [ `md5sum ${CUSTOM_KERNEL_TARBALL} | awk '{print $1}'` != expected_md5 ]; then
+	checksum=`md5sum ${CUSTOM_KERNEL_TARBALL} | awk '{print $1}'`
+	if [ ${checksum} != ${expected_md5} ]; then
 		echo "Wrong checksum for kernel source, abort!"
-		echo "md5(${CUSTOM_KERNEL_TARBALL}) should be: ${expected_md5}"
+		echo "md5(${CUSTOM_KERNEL_TARBALL}) should be: '${expected_md5}', got: '${checksum}'"
 		exit 1
 	fi
 	[ ! -d ${BUILD_ROOT}/tmp ] && mkdir -p ${BUILD_ROOT}/tmp
