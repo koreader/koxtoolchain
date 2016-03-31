@@ -105,16 +105,16 @@ CT_ARCH_SUPPORTS_SOFTFP=y
 CT_ARCH_DEFAULT_HAS_MMU=y
 CT_ARCH_DEFAULT_LE=y
 CT_ARCH_DEFAULT_32=y
-CT_ARCH_CPU="arm1136jf-s"
-CT_ARCH_FPU="vfp"
+CT_ARCH_CPU="cortex-a8"
+CT_ARCH_FPU="neon"
 # CT_ARCH_BE is not set
 CT_ARCH_LE=y
 CT_ARCH_32=y
 # CT_ARCH_64 is not set
 CT_ARCH_BITNESS=32
-# CT_ARCH_FLOAT_HW is not set
+CT_ARCH_FLOAT_HW=y
 # CT_ARCH_FLOAT_SW is not set
-CT_TARGET_CFLAGS="-O2 -fomit-frame-pointer -frename-registers -fweb -mno-unaligned-access -pipe"
+CT_TARGET_CFLAGS="-O3 -fomit-frame-pointer -frename-registers -fweb -pipe"
 CT_TARGET_LDFLAGS="-Wl,-O1 -Wl,--as-needed"
 # CT_ARCH_alpha is not set
 CT_ARCH_arm=y
@@ -156,18 +156,19 @@ CT_ARCH_ENDIAN="little"
 #
 CT_ARCH_EXCLUSIVE_WITH_CPU=y
 # CT_ARCH_FLOAT_AUTO is not set
-CT_ARCH_FLOAT_SOFTFP=y
-CT_ARCH_FLOAT="softfp"
+# CT_ARCH_FLOAT_SOFTFP is not set
+CT_ARCH_FLOAT="hard"
 
 #
 # arm other options
 #
-CT_ARCH_ARM_MODE="arm"
-CT_ARCH_ARM_MODE_ARM=y
-# CT_ARCH_ARM_MODE_THUMB is not set
+CT_ARCH_ARM_MODE="thumb"
+# CT_ARCH_ARM_MODE_ARM is not set
+CT_ARCH_ARM_MODE_THUMB=y
 # CT_ARCH_ARM_INTERWORKING is not set
 CT_ARCH_ARM_EABI_FORCE=y
 CT_ARCH_ARM_EABI=y
+# CT_ARCH_ARM_TUPLE_USE_EABIHF is not set
 
 #
 # Toolchain options
@@ -187,7 +188,7 @@ CT_TOOLCHAIN_BUGURL=""
 #
 # Tuple completion and aliasing
 #
-CT_TARGET_VENDOR="kindle"
+CT_TARGET_VENDOR="kobo"
 CT_TARGET_ALIAS_SED_EXPR=""
 CT_TARGET_ALIAS=""
 
@@ -217,7 +218,7 @@ CT_BUILD_SUFFIX=""
 #
 CT_KERNEL_SUPPORTS_SHARED_LIBS=y
 CT_KERNEL="linux"
-CT_KERNEL_VERSION="2.6.32.68"
+CT_KERNEL_VERSION="custom"
 # CT_KERNEL_bare_metal is not set
 CT_KERNEL_linux=y
 CT_KERNEL_bare_metal_AVAILABLE=y
@@ -231,8 +232,8 @@ CT_KERNEL_linux_AVAILABLE=y
 # CT_KERNEL_V_3_10 is not set
 # CT_KERNEL_V_3_4 is not set
 # CT_KERNEL_V_3_2 is not set
-CT_KERNEL_V_2_6_32=y
-# CT_KERNEL_LINUX_CUSTOM is not set
+# CT_KERNEL_V_2_6_32 is not set
+CT_KERNEL_LINUX_CUSTOM=y
 CT_KERNEL_windows_AVAILABLE=y
 
 #
@@ -312,7 +313,7 @@ CT_BINUTILS_EXTRA_CONFIG_ARRAY=""
 # C-library
 #
 CT_LIBC="glibc"
-CT_LIBC_VERSION="2.18"
+CT_LIBC_VERSION="2.11"
 CT_LIBC_glibc=y
 # CT_LIBC_musl is not set
 # CT_LIBC_uClibc is not set
@@ -324,7 +325,7 @@ CT_THREADS="nptl"
 # CT_LIBC_GLIBC_V_2_21 is not set
 # CT_LIBC_GLIBC_V_2_20 is not set
 # CT_LIBC_GLIBC_V_2_19 is not set
-CT_LIBC_GLIBC_V_2_18=y
+# CT_LIBC_GLIBC_V_2_18 is not set
 # CT_LIBC_GLIBC_V_2_17 is not set
 # CT_LIBC_GLIBC_V_2_16_0 is not set
 # CT_LIBC_GLIBC_V_2_15 is not set
@@ -334,12 +335,12 @@ CT_LIBC_GLIBC_V_2_18=y
 # CT_LIBC_GLIBC_V_2_12_2 is not set
 # CT_LIBC_GLIBC_V_2_12_1 is not set
 # CT_LIBC_GLIBC_V_2_11_1 is not set
-# CT_LIBC_GLIBC_V_2_11 is not set
+CT_LIBC_GLIBC_V_2_11=y
 # CT_LIBC_GLIBC_V_2_10_1 is not set
 # CT_LIBC_GLIBC_V_2_9 is not set
 # CT_LIBC_GLIBC_V_2_8 is not set
 # CT_LIBC_GLIBC_CUSTOM is not set
-CT_LIBC_GLIBC_2_17_or_later=y
+# CT_LIBC_GLIBC_2_17_or_later=y
 CT_LIBC_mingw_AVAILABLE=y
 CT_LIBC_musl_AVAILABLE=y
 CT_LIBC_newlib_AVAILABLE=y
@@ -357,7 +358,7 @@ CT_LIBC_XLDD=y
 #
 # glibc other options
 #
-# CT_LIBC_GLIBC_PORTS_EXTERNAL is not set
+CT_LIBC_GLIBC_PORTS_EXTERNAL=y
 CT_LIBC_GLIBC_MAY_FORCE_PORTS=y
 CT_LIBC_glibc_familly=y
 CT_LIBC_GLIBC_EXTRA_CONFIG_ARRAY=""
@@ -394,8 +395,8 @@ CT_LIBC_ADDONS_LIST=""
 # CT_LIBC_GLIBC_KERNEL_VERSION_NONE is not set
 # CT_LIBC_GLIBC_KERNEL_VERSION_AS_HEADERS is not set
 CT_LIBC_GLIBC_KERNEL_VERSION_CHOSEN=y
-CT_LIBC_GLIBC_MIN_KERNEL_VERSION="2.6.22"
-CT_LIBC_GLIBC_MIN_KERNEL="2.6.22"
+CT_LIBC_GLIBC_MIN_KERNEL_VERSION="2.6.33"
+CT_LIBC_GLIBC_MIN_KERNEL="2.6.33"
 
 #
 # C compiler
@@ -409,8 +410,8 @@ CT_CC_GCC_SHOW_LINARO=y
 # CT_CC_GCC_V_5_2_0 is not set
 # CT_CC_GCC_V_linaro_4_9 is not set
 # CT_CC_GCC_V_4_9_3 is not set
-# CT_CC_GCC_V_linaro_4_8 is not set
-CT_CC_GCC_V_4_8_5=y
+CT_CC_GCC_V_linaro_4_8=y
+# CT_CC_GCC_V_4_8_5 is not set
 # CT_CC_GCC_V_linaro_4_7 is not set
 # CT_CC_GCC_V_4_7_4 is not set
 # CT_CC_GCC_V_linaro_4_6 is not set
@@ -443,7 +444,7 @@ CT_CC_GCC_USE_GMP_MPFR=y
 CT_CC_GCC_USE_MPC=y
 CT_CC_GCC_HAS_LIBQUADMATH=y
 CT_CC_GCC_HAS_LIBSANITIZER=y
-CT_CC_GCC_VERSION="4.8.5"
+CT_CC_GCC_VERSION="linaro-4.8-2015.06"
 # CT_CC_LANG_FORTRAN is not set
 CT_CC_GCC_ENABLE_CXX_FLAGS=""
 CT_CC_GCC_CORE_EXTRA_CONFIG_ARRAY=""
@@ -474,11 +475,11 @@ CT_CC_CXA_ATEXIT=y
 CT_CC_GCC_SJLJ_EXCEPTIONS=m
 CT_CC_GCC_LDBL_128=m
 # CT_CC_GCC_BUILD_ID is not set
-CT_CC_GCC_LNK_HASH_STYLE_DEFAULT=y
+# CT_CC_GCC_LNK_HASH_STYLE_DEFAULT is not set
 # CT_CC_GCC_LNK_HASH_STYLE_SYSV is not set
-# CT_CC_GCC_LNK_HASH_STYLE_GNU is not set
+CT_CC_GCC_LNK_HASH_STYLE_GNU=y
 # CT_CC_GCC_LNK_HASH_STYLE_BOTH is not set
-CT_CC_GCC_LNK_HASH_STYLE=""
+CT_CC_GCC_LNK_HASH_STYLE="gnu"
 CT_CC_GCC_DEC_FLOAT_AUTO=y
 # CT_CC_GCC_DEC_FLOAT_BID is not set
 # CT_CC_GCC_DEC_FLOAT_DPD is not set
@@ -515,25 +516,17 @@ CT_CC_LANG_OTHERS=""
 # Companion libraries
 #
 CT_COMPLIBS_NEEDED=y
-CT_LIBICONV_NEEDED=y
-CT_GETTEXT_NEEDED=y
 CT_GMP_NEEDED=y
 CT_MPFR_NEEDED=y
 CT_ISL_NEEDED=y
 CT_CLOOG_NEEDED=y
 CT_MPC_NEEDED=y
 CT_COMPLIBS=y
-CT_LIBICONV=y
-CT_GETTEXT=y
 CT_GMP=y
 CT_MPFR=y
 CT_ISL=y
 CT_CLOOG=y
 CT_MPC=y
-CT_LIBICONV_V_1_14=y
-CT_LIBICONV_VERSION="1.14"
-CT_GETTEXT_V_0_19_6=y
-CT_GETTEXT_VERSION="0.19.6"
 CT_GMP_V_6_0_0=y
 # CT_GMP_V_5_1_3 is not set
 # CT_GMP_V_5_1_1 is not set
@@ -553,10 +546,10 @@ CT_MPFR_V_3_1_3=y
 # CT_MPFR_V_2_4_1 is not set
 # CT_MPFR_V_2_4_0 is not set
 CT_MPFR_VERSION="3.1.3"
-CT_ISL_V_0_14=y
+CT_ISL_V_0_15=y
 CT_ISL_V_0_14_or_later=y
 CT_ISL_V_0_12_or_later=y
-CT_ISL_VERSION="0.14"
+CT_ISL_VERSION="0.15"
 CT_CLOOG_V_0_18_4=y
 # CT_CLOOG_V_0_18_1 is not set
 # CT_CLOOG_V_0_18_0 is not set
