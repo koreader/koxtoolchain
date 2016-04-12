@@ -10,7 +10,11 @@ Dependencies
 
 * gperf
 * help2man
+* bison
 * texinfo
+* flex
+* gawk
+* libncurses5-dev
 
 
 Usage
