@@ -16,12 +16,17 @@
 
 CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_ROOT=${CUR_DIR}/build
+DEFAULT_GIT_REPO="https://github.com/crosstool-ng/crosstool-ng.git"
 
 Build_CT-NG() {
 	echo "[*] Building CrossTool-NG . . ."
+	ct_ng_git_repo=$1
+	shift
 	ct_ng_commit=$1
-	cfg_path=$2
+	shift
+	cfg_path=$1
 	PARALLEL_JOBS=$(expr `grep -c ^processor /proc/cpuinfo` + 1)
+	echo "[-] ct-ng git repo: ${ct_ng_git_repo}"
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
 	echo "[-] ct-ng config path: ${cfg_path}"
 	echo "[-] compiling with ${PARALLEL_JOBS} parallel jobs"
@@ -29,10 +34,12 @@ Build_CT-NG() {
 	[ ! -d ${BUILD_ROOT} ] && mkdir -p ${BUILD_ROOT}
 	pushd ${BUILD_ROOT}
 		if [ ! -d CT-NG ]; then
-			git clone https://github.com/crosstool-ng/crosstool-ng.git CT-NG
+			git clone ${ct_ng_git_repo} CT-NG
 		fi
 		pushd CT-NG
-			git fetch
+			git remote rm origin
+			git remote add origin ${ct_ng_git_repo}
+			git fetch origin
 			git checkout ${ct_ng_commit}
 			./bootstrap
 			[ ! -d ${BUILD_ROOT}/CT_NG_BUILD ] && mkdir -p ${BUILD_ROOT}/CT_NG_BUILD
@@ -82,7 +89,7 @@ build_kobo_ct() {
 	tmp_cfg=${BUILD_ROOT}/tmp/ct-ng-kobo-config
 	cp ${CUR_DIR}/configs/ct-ng-kobo-config ${tmp_cfg}
 	echo "CT_KERNEL_LINUX_CUSTOM_LOCATION=\"${CUSTOM_KERNEL_TARBALL}\"" >> ${tmp_cfg}
-	Build_CT-NG crosstool-ng-1.22.0 ${tmp_cfg}
+	Build_CT-NG ${DEFAULT_GIT_REPO} crosstool-ng-1.22.0 ${tmp_cfg}
 	rm ${tmp_cfg}
 }
 
@@ -111,7 +118,10 @@ case $1 in
 		build_kobo_ct
 		;;
 	kindle)
-		Build_CT-NG crosstool-ng-1.22.0 ${CUR_DIR}/configs/ct-ng-kindle-config
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			crosstool-ng-1.22.0 \
+			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	*)
 		echo "[!] $1 not supported!"

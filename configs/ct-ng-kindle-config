@@ -23,7 +23,8 @@ CT_EXPERIMENTAL=y
 #
 # Paths
 #
-CT_LOCAL_TARBALLS_DIR=""
+CT_LOCAL_TARBALLS_DIR="${HOME}/x-tools/src"
+CT_SAVE_TARBALLS=y
 CT_CUSTOM_LOCATION_ROOT_DIR=""
 CT_WORK_DIR="${CT_TOP_DIR}/.build"
 CT_PREFIX_DIR="${HOME}/x-tools/${CT_TARGET}"
@@ -114,8 +115,8 @@ CT_ARCH_32=y
 CT_ARCH_BITNESS=32
 # CT_ARCH_FLOAT_HW is not set
 # CT_ARCH_FLOAT_SW is not set
-CT_TARGET_CFLAGS="-O2 -fomit-frame-pointer -frename-registers -fweb -mno-unaligned-access -pipe"
-CT_TARGET_LDFLAGS="-Wl,-O1 -Wl,--as-needed"
+CT_TARGET_CFLAGS="-O2 -mno-unaligned-access -pipe"
+CT_TARGET_LDFLAGS=""
 # CT_ARCH_alpha is not set
 CT_ARCH_arm=y
 # CT_ARCH_avr is not set
@@ -231,6 +232,8 @@ CT_KERNEL_linux_AVAILABLE=y
 # CT_KERNEL_V_3_10 is not set
 # CT_KERNEL_V_3_4 is not set
 # CT_KERNEL_V_3_2 is not set
+# TODO: support 2.6.27 kernel properly
+# CT_KERNEL_V_2_6_27=y
 CT_KERNEL_V_2_6_32=y
 # CT_KERNEL_LINUX_CUSTOM is not set
 CT_KERNEL_windows_AVAILABLE=y
@@ -312,7 +315,7 @@ CT_BINUTILS_EXTRA_CONFIG_ARRAY=""
 # C-library
 #
 CT_LIBC="glibc"
-CT_LIBC_VERSION="2.18"
+CT_LIBC_VERSION="2.9"
 CT_LIBC_glibc=y
 # CT_LIBC_musl is not set
 # CT_LIBC_uClibc is not set
@@ -324,7 +327,7 @@ CT_THREADS="nptl"
 # CT_LIBC_GLIBC_V_2_21 is not set
 # CT_LIBC_GLIBC_V_2_20 is not set
 # CT_LIBC_GLIBC_V_2_19 is not set
-CT_LIBC_GLIBC_V_2_18=y
+# CT_LIBC_GLIBC_V_2_18 is not set
 # CT_LIBC_GLIBC_V_2_17 is not set
 # CT_LIBC_GLIBC_V_2_16_0 is not set
 # CT_LIBC_GLIBC_V_2_15 is not set
@@ -336,10 +339,9 @@ CT_LIBC_GLIBC_V_2_18=y
 # CT_LIBC_GLIBC_V_2_11_1 is not set
 # CT_LIBC_GLIBC_V_2_11 is not set
 # CT_LIBC_GLIBC_V_2_10_1 is not set
-# CT_LIBC_GLIBC_V_2_9 is not set
+CT_LIBC_GLIBC_V_2_9=y
 # CT_LIBC_GLIBC_V_2_8 is not set
 # CT_LIBC_GLIBC_CUSTOM is not set
-CT_LIBC_GLIBC_2_17_or_later=y
 CT_LIBC_mingw_AVAILABLE=y
 CT_LIBC_musl_AVAILABLE=y
 CT_LIBC_newlib_AVAILABLE=y
@@ -357,7 +359,7 @@ CT_LIBC_XLDD=y
 #
 # glibc other options
 #
-# CT_LIBC_GLIBC_PORTS_EXTERNAL is not set
+CT_LIBC_GLIBC_PORTS_EXTERNAL=y
 CT_LIBC_GLIBC_MAY_FORCE_PORTS=y
 CT_LIBC_glibc_familly=y
 CT_LIBC_GLIBC_EXTRA_CONFIG_ARRAY=""
@@ -409,8 +411,8 @@ CT_CC_GCC_SHOW_LINARO=y
 # CT_CC_GCC_V_5_2_0 is not set
 # CT_CC_GCC_V_linaro_4_9 is not set
 # CT_CC_GCC_V_4_9_3 is not set
-# CT_CC_GCC_V_linaro_4_8 is not set
-CT_CC_GCC_V_4_8_5=y
+CT_CC_GCC_V_linaro_4_8=y
+# CT_CC_GCC_V_4_8_5 is not set
 # CT_CC_GCC_V_linaro_4_7 is not set
 # CT_CC_GCC_V_4_7_4 is not set
 # CT_CC_GCC_V_linaro_4_6 is not set
@@ -443,7 +445,7 @@ CT_CC_GCC_USE_GMP_MPFR=y
 CT_CC_GCC_USE_MPC=y
 CT_CC_GCC_HAS_LIBQUADMATH=y
 CT_CC_GCC_HAS_LIBSANITIZER=y
-CT_CC_GCC_VERSION="4.8.5"
+CT_CC_GCC_VERSION="linaro-4.8-2015.06"
 # CT_CC_LANG_FORTRAN is not set
 CT_CC_GCC_ENABLE_CXX_FLAGS=""
 CT_CC_GCC_CORE_EXTRA_CONFIG_ARRAY=""
