@@ -66,6 +66,12 @@ Build_CT-NG() {
 			ct-ng oldconfig
 			# ct-ng menuconfig
 			nice ct-ng build
+			pushd .build
+				tc_prefix=$(ls -d arm-*)
+			popd
+			echo "[INFO ]  ================================================================="
+			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_prefix}/bin to your PATH."
+			echo "[INFO ]  ================================================================="
 		popd
 	popd
 }
@@ -120,7 +126,7 @@ case $1 in
 	kindle)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			crosstool-ng-1.22.0 \
+			kindle \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	*)
