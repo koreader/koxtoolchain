@@ -106,6 +106,7 @@ usage: $0 PLATFORM
 Supported platforms:
 
 	kindle
+	kindle5
 	kobo
 "
 
@@ -123,10 +124,16 @@ case $1 in
 	kobo)
 		build_kobo_ct
 		;;
+	kindle5)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			9b09eb907ba8f2e24d4d030096968401c8333274 \
+			${CUR_DIR}/configs/ct-ng-kindle5-config
+		;;
 	kindle)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			kindle \
+			9b09eb907ba8f2e24d4d030096968401c8333274 \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	*)
