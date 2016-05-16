@@ -23,7 +23,7 @@ The build script takes platform name as its first argument. For example, to
 build a cross toolchina for legacy non-touch kindle devices, type:
 
 ```
-./gen-tc.sh kindle
+./gen-tc.sh kindlepw2
 ```
 
 You can use `./gen-tc.sh -h` to get a list of supported platforms.
