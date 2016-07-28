@@ -168,7 +168,7 @@ CT_ARCH_ARM_MODE_THUMB=y
 # CT_ARCH_ARM_INTERWORKING is not set
 CT_ARCH_ARM_EABI_FORCE=y
 CT_ARCH_ARM_EABI=y
-CT_ARCH_ARM_TUPLE_USE_EABIHF=y
+# CT_ARCH_ARM_TUPLE_USE_EABIHF=y
 
 #
 # Toolchain options
@@ -313,7 +313,7 @@ CT_BINUTILS_EXTRA_CONFIG_ARRAY=""
 # C-library
 #
 CT_LIBC="glibc"
-CT_LIBC_VERSION="2.11"
+CT_LIBC_VERSION="2.15"
 CT_LIBC_glibc=y
 # CT_LIBC_musl is not set
 # CT_LIBC_uClibc is not set
@@ -328,19 +328,18 @@ CT_THREADS="nptl"
 # CT_LIBC_GLIBC_V_2_18 is not set
 # CT_LIBC_GLIBC_V_2_17 is not set
 # CT_LIBC_GLIBC_V_2_16_0 is not set
-# CT_LIBC_GLIBC_V_2_15 is not set
+CT_LIBC_GLIBC_V_2_15=y
 # CT_LIBC_GLIBC_V_2_14_1 is not set
 # CT_LIBC_GLIBC_V_2_14 is not set
 # CT_LIBC_GLIBC_V_2_13 is not set
 # CT_LIBC_GLIBC_V_2_12_2 is not set
 # CT_LIBC_GLIBC_V_2_12_1 is not set
 # CT_LIBC_GLIBC_V_2_11_1 is not set
-CT_LIBC_GLIBC_V_2_11=y
+# CT_LIBC_GLIBC_V_2_11 is not set
 # CT_LIBC_GLIBC_V_2_10_1 is not set
 # CT_LIBC_GLIBC_V_2_9 is not set
 # CT_LIBC_GLIBC_V_2_8 is not set
 # CT_LIBC_GLIBC_CUSTOM is not set
-# CT_LIBC_GLIBC_2_17_or_later=y
 CT_LIBC_mingw_AVAILABLE=y
 CT_LIBC_musl_AVAILABLE=y
 CT_LIBC_newlib_AVAILABLE=y
@@ -361,7 +360,7 @@ CT_LIBC_XLDD=y
 CT_LIBC_GLIBC_PORTS_EXTERNAL=y
 CT_LIBC_GLIBC_MAY_FORCE_PORTS=y
 CT_LIBC_glibc_familly=y
-CT_LIBC_GLIBC_EXTRA_CONFIG_ARRAY=""
+CT_LIBC_GLIBC_EXTRA_CONFIG_ARRAY="libc_cv_ctors_header=yes libc_cv_gcc_builtin_expect=yes"
 CT_LIBC_GLIBC_CONFIGPARMS=""
 CT_LIBC_GLIBC_EXTRA_CFLAGS=""
 CT_LIBC_EXTRA_CC_ARGS=""
@@ -575,10 +574,13 @@ CT_MPC_VERSION="1.0.3"
 # Companion tools
 #
 
-#
-# READ HELP before you say 'Y' below !!!
-#
-# CT_COMP_TOOLS is not set
+CT_COMP_TOOLS=y
+CT_COMP_TOOLS_make=y
+# CT_COMP_TOOLS_make_gmake is not set
+# CT_COMP_TOOLS_m4 is not set
+# CT_COMP_TOOLS_autoconf is not set
+# CT_COMP_TOOLS_automake is not set
+# CT_COMP_TOOLS_libtool is not set
 
 #
 # Test suite
