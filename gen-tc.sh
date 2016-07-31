@@ -78,7 +78,7 @@ Build_CT-NG() {
 
 build_kobo_ct() {
 	[ ! -d ${BUILD_ROOT}/downloads ] && mkdir -p ${BUILD_ROOT}/downloads
-	CUSTOM_KERNEL_TARBALL=${BUILD_ROOT}/downloads/kobo-linux-2.6.35.3.tar.bz2
+	CUSTOM_KERNEL_TARBALL=${BUILD_ROOT}/downloads/linux-kobo-2.6.35.3.tar.bz2
 	if [ ! -f ${CUSTOM_KERNEL_TARBALL} ]; then
 		echo "Fetching kernel source from Kobo github repo..."
 		curl -k https://raw.githubusercontent.com/kobolabs/Kobo-Reader/master/hw/imx507-aurah2o/linux-2.6.35.3.tar.bz2 \
@@ -95,7 +95,10 @@ build_kobo_ct() {
 	tmp_cfg=${BUILD_ROOT}/tmp/ct-ng-kobo-config
 	cp ${CUR_DIR}/configs/ct-ng-kobo-config ${tmp_cfg}
 	echo "CT_KERNEL_LINUX_CUSTOM_LOCATION=\"${CUSTOM_KERNEL_TARBALL}\"" >> ${tmp_cfg}
-	Build_CT-NG ${DEFAULT_GIT_REPO} crosstool-ng-1.22.0 ${tmp_cfg}
+	Build_CT-NG \
+		https://github.com/NiLuJe/crosstool-ng.git \
+		17658f4e127581d816ed6b06969dc41ef7219011 \
+		${tmp_cfg}
 	rm ${tmp_cfg}
 }
 
@@ -128,19 +131,19 @@ case $1 in
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			9b09eb907ba8f2e24d4d030096968401c8333274 \
+			17658f4e127581d816ed6b06969dc41ef7219011 \
 			${CUR_DIR}/configs/ct-ng-kindlepw2-config
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			9b09eb907ba8f2e24d4d030096968401c8333274 \
+			17658f4e127581d816ed6b06969dc41ef7219011 \
 			${CUR_DIR}/configs/ct-ng-kindle5-config
 		;;
 	kindle)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			9b09eb907ba8f2e24d4d030096968401c8333274 \
+			17658f4e127581d816ed6b06969dc41ef7219011 \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	*)
