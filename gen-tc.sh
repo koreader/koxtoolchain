@@ -2,12 +2,13 @@
 #
 # adapted from NiLuJe's build script:
 # http://www.mobileread.com/forums/showthread.php?t=88004
+# (live copy: http://trac.ak-team.com/trac/browser/niluje/Configs/trunk/Kindle/Misc/x-compile.sh)
 #
 # =================== original header ====================
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 12265 2015-08-20 15:24:44Z NiLuJe $
+# $Id: x-compile.sh 14796 2018-04-14 15:22:18Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -25,7 +26,7 @@ Build_CT-NG() {
 	ct_ng_commit=$1
 	shift
 	cfg_path=$1
-	PARALLEL_JOBS=$(expr `grep -c ^processor /proc/cpuinfo` + 1)
+	PARALLEL_JOBS=$(expr $(grep -c ^processor /proc/cpuinfo) + 1)
 	echo "[-] ct-ng git repo: ${ct_ng_git_repo}"
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
 	echo "[-] ct-ng config path: ${cfg_path}"
@@ -55,16 +56,13 @@ Build_CT-NG() {
 		[ ! -d ${TC_BUILD_DIR} ] && mkdir -p ${TC_BUILD_DIR}
 		pushd ${TC_BUILD_DIR}
 			ct-ng distclean
-			rm -rf build.log config .config .config.2 .config.old config.gen \
-				.build/arm-kindle-linux-gnueabi .build/arm-kindle5-linux-gnueabi \
-				.build/arm-kindlepw2-linux-gnueabi .build/arm-kobo-linux-gnueabi \
-				.build/src .build/tools .build/tarballs/gcc-linaro-*.tar.xz
 
 			unset CFLAGS CXXFLAGS LDFLAGS
 			cp ${cfg_path} .config
 			echo "CT_PARALLEL_JOBS=${PARALLEL_JOBS}" >> .config
 			ct-ng oldconfig
 			# ct-ng menuconfig
+			ct-ng updatetools
 			nice ct-ng build
 			pushd .build
 				tc_prefix=$(ls -d arm-*)
@@ -75,33 +73,6 @@ Build_CT-NG() {
 		popd
 	popd
 }
-
-build_kobo_ct() {
-	[ ! -d ${BUILD_ROOT}/downloads ] && mkdir -p ${BUILD_ROOT}/downloads
-	CUSTOM_KERNEL_TARBALL=${BUILD_ROOT}/downloads/linux-kobo-2.6.35.3.tar.bz2
-	if [ ! -f ${CUSTOM_KERNEL_TARBALL} ]; then
-		echo "Fetching kernel source from Kobo github repo..."
-		curl -k https://raw.githubusercontent.com/kobolabs/Kobo-Reader/master/hw/imx507-aurah2o/linux-2.6.35.3.tar.bz2 \
-			> ${CUSTOM_KERNEL_TARBALL}
-	fi
-	expected_md5='fc5cc4a95ca363a2a98e726151bc6933'
-	checksum=`md5sum ${CUSTOM_KERNEL_TARBALL} | awk '{print $1}'`
-	if [ ${checksum} != ${expected_md5} ]; then
-		echo "Wrong checksum for kernel source, abort!"
-		echo "md5(${CUSTOM_KERNEL_TARBALL}) should be: '${expected_md5}', got: '${checksum}'"
-		exit 1
-	fi
-	[ ! -d ${BUILD_ROOT}/tmp ] && mkdir -p ${BUILD_ROOT}/tmp
-	tmp_cfg=${BUILD_ROOT}/tmp/ct-ng-kobo-config
-	cp ${CUR_DIR}/configs/ct-ng-kobo-config ${tmp_cfg}
-	echo "CT_KERNEL_LINUX_CUSTOM_LOCATION=\"${CUSTOM_KERNEL_TARBALL}\"" >> ${tmp_cfg}
-	Build_CT-NG \
-		https://github.com/NiLuJe/crosstool-ng.git \
-		17658f4e127581d816ed6b06969dc41ef7219011 \
-		${tmp_cfg}
-	rm ${tmp_cfg}
-}
-
 
 HELP_MSG="
 usage: $0 PLATFORM
@@ -126,24 +97,28 @@ case $1 in
 		exit 0
 		;;
 	kobo)
-		build_kobo_ct
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			1.23-kindle \
+			${CUR_DIR}/configs/ct-ng-kobo-config
+		;;
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			17658f4e127581d816ed6b06969dc41ef7219011 \
+			1.23-kindle \
 			${CUR_DIR}/configs/ct-ng-kindlepw2-config
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			17658f4e127581d816ed6b06969dc41ef7219011 \
+			1.23-kindle \
 			${CUR_DIR}/configs/ct-ng-kindle5-config
 		;;
 	kindle)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			17658f4e127581d816ed6b06969dc41ef7219011 \
+			1.23-kindle \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	*)
