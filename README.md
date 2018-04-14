@@ -14,12 +14,11 @@ Dependencies
 * texinfo
 * flex
 * gawk
-* libncurses5-dev
 
 For ubuntu user:
 
 ```bash
-sudo apt-get install gperf help2man bison texinfo flex gawk libncurses5-dev 
+sudo apt-get install gperf help2man bison texinfo flex gawk
 ```
 
 Usage
