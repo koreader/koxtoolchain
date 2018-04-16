@@ -102,7 +102,6 @@ case $1 in
 			efec696101ec01b89ba289a6c4f81cec42e50a45 \
 			${CUR_DIR}/configs/ct-ng-kobo-config
 		;;
-		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
