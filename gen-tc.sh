@@ -26,7 +26,7 @@ Build_CT-NG() {
 	ct_ng_commit=$1
 	shift
 	cfg_path=$1
-	PARALLEL_JOBS=$(expr $(grep -c ^processor /proc/cpuinfo) + 1)
+	PARALLEL_JOBS=$(($(getconf _NPROCESSORS_ONLN 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 0) + 1))
 	echo "[-] ct-ng git repo: ${ct_ng_git_repo}"
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
 	echo "[-] ct-ng config path: ${cfg_path}"
