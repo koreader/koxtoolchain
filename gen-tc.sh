@@ -83,6 +83,7 @@ Supported platforms:
 	kindle5
 	kindlepw2
 	kobo
+	cervantes
 "
 
 if [ $# -lt 1 ]; then
@@ -119,6 +120,12 @@ case $1 in
 			https://github.com/NiLuJe/crosstool-ng.git \
 			390464e718ed2db391019dcbb029df4f7d90ab55 \
 			${CUR_DIR}/configs/ct-ng-kindle-config
+		;;
+	cervantes)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			390464e718ed2db391019dcbb029df4f7d90ab55 \
+			${CUR_DIR}/configs/ct-ng-cervantes-config
 		;;
 	*)
 		echo "[!] $1 not supported!"
