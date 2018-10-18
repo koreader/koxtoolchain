@@ -26,7 +26,7 @@ Build_CT-NG() {
 	ct_ng_commit=$1
 	shift
 	cfg_path=$1
-	PARALLEL_JOBS=$(expr $(grep -c ^processor /proc/cpuinfo) + 1)
+	PARALLEL_JOBS=$(($(getconf _NPROCESSORS_ONLN 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 0) + 1))
 	echo "[-] ct-ng git repo: ${ct_ng_git_repo}"
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
 	echo "[-] ct-ng config path: ${cfg_path}"
@@ -100,25 +100,25 @@ case $1 in
 	kobo)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			390464e718ed2db391019dcbb029df4f7d90ab55 \
+			8644d5b1f38dd597211512d08fd1a828de1de17f \
 			${CUR_DIR}/configs/ct-ng-kobo-config
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			390464e718ed2db391019dcbb029df4f7d90ab55 \
+			8644d5b1f38dd597211512d08fd1a828de1de17f \
 			${CUR_DIR}/configs/ct-ng-kindlepw2-config
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			390464e718ed2db391019dcbb029df4f7d90ab55 \
+			8644d5b1f38dd597211512d08fd1a828de1de17f \
 			${CUR_DIR}/configs/ct-ng-kindle5-config
 		;;
 	kindle)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			390464e718ed2db391019dcbb029df4f7d90ab55 \
+			8644d5b1f38dd597211512d08fd1a828de1de17f \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	cervantes)

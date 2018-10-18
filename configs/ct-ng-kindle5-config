@@ -395,9 +395,9 @@ CT_CC_CORE_PASS_1_NEEDED=y
 CT_CC_CORE_PASS_2_NEEDED=y
 CT_CC_gcc=y
 # CT_CC_GCC_CUSTOM is not set
-CT_CC_GCC_VERSION="linaro-7.2-2017.11"
+CT_CC_GCC_VERSION="linaro-7.3-2018.05"
 CT_CC_GCC_SHOW_LINARO=y
-CT_CC_GCC_V_linaro_7_2=y
+CT_CC_GCC_V_linaro_7_3=y
 # CT_CC_GCC_V_7_3_0 is not set
 # CT_CC_GCC_V_linaro_6_4 is not set
 # CT_CC_GCC_V_6_4_0 is not set
