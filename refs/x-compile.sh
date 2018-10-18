@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 14796 2018-04-14 15:22:18Z NiLuJe $
+# $Id: x-compile.sh 15482 2018-10-17 15:48:55Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -10,8 +10,9 @@
 
 ## Using CrossTool-NG (http://crosstool-ng.org/)
 SVN_ROOT="${HOME}/SVN"
-## Remember where we are...
-SCRIPTS_BASE_DIR="$(readlink -f "${BASH_SOURCE%/*}")"
+## Remember where we are... (c.f., https://stackoverflow.com/questions/9901210/bash-source0-equivalent-in-zsh)
+SCRIPT_NAME="${BASH_SOURCE[0]-${(%):-%x}}"
+SCRIPTS_BASE_DIR="$(readlink -f "${SCRIPT_NAME%/*}")"
 
 # Setup xz multi-threading...
 export XZ_DEFAULTS="-T 0"
@@ -31,6 +32,17 @@ is_ver_gte()
 	[ "${1}" = "$(echo -e "${1}\n${2}" | sort -V | tail -n1)" ]
 }
 
+## We never, ever want to be using libtool's .la files. They're terrible, and cause more trouble than they're worth...
+# NOTE: c.f., https://flameeyes.blog/2008/04/14/what-about-those-la-files/ for more details.
+# NOTE: In our particular context, see the FT build comments for the particular insanity they caused...
+prune_la_files()
+{
+	if [ -d "${TC_BUILD_DIR}/lib" ] ; then
+		find "${TC_BUILD_DIR}/lib" -name "*.la" -type l -delete
+		find "${TC_BUILD_DIR}/lib" -name "*.la" -type f -delete
+	fi
+}
+
 ## Make the window title useful when running this through tmux...
 pkgIndex="0"
 update_title_info()
@@ -39,15 +51,42 @@ update_title_info()
 	pkgName="${PWD##*/}"
 	# Increment package counter...
 	pkgIndex="$((pkgIndex + 1))"
-	# Get number of packages by counting the amount of calls to this very function in the script... Not 100% accurate because of the branching...
-	[[ -z ${pkgCount} ]] && pkgCount="$(grep -c '^[[:blank:]]*update_title_info$' "${SCRIPTS_BASE_DIR}/x-compile.sh")"
+	# Get number of packages by counting the amount of calls to this very function in the script...
+	if [[ -z ${pkgCount} ]] ; then
+		# May not be 100% accurate because of the branching, although we try to manually correct that...
+		pkgCount="$(grep -c '^[[:blank:]]*update_title_info$' "${SCRIPTS_BASE_DIR}/x-compile.sh")"
+		# Try to correct the total count by hard-coding the amount of branches...
+		# There's zlib vs. zlib-ng...
+		pkgCount="$((pkgCount - 1))"
+		# There's OpenSSL 1.0 vs. 0.9.8...
+		pkgCount="$((pkgCount - 1))"
+		# There's Gandalf which we only build for K5 & PW2...
+		if [[ "${KINDLE_TC}" != "K5" ]] && [[ "${KINDLE_TC}" != "PW2" ]] ; then
+			pkgCount="$((pkgCount - 1))"
+		fi
+		# There's ICU which we don't always build...
+		if [[ "${KINDLE_TC}" != "K5" ]] && [[ "${KINDLE_TC}" != "PW2" ]] && [[ "${KINDLE_TC}" != "KOBO" ]] ; then
+			pkgCount="$((pkgCount - 1))"
+		fi
+		# There's cryptography & PyOpenSSL which we don't build on the K3...
+		if [[ "${KINDLE_TC}" == "K3" ]] ; then
+			pkgCount="$((pkgCount - 2))"
+		fi
+		# There's ltrace which we don't build on the K3...
+		if [[ "${KINDLE_TC}" == "K3" ]] ; then
+			pkgCount="$((pkgCount - 1))"
+		fi
+	fi
 
 	# Set the panel name to something short & useful
 	myPanelTitle="X-TC ${KINDLE_TC}"
 	echo -e '\033k'${myPanelTitle}'\033\\'
 	# Set the window title to a longer description of what we're doing...
-	myWindowTitle="Building ${pkgName} for ${KINDLE_TC} (${pkgIndex} of ~${pkgCount})"
+	myWindowTitle="Building ${pkgName} for ${KINDLE_TC} (${pkgIndex} of ${pkgCount})"
 	echo -e '\033]2;'${myWindowTitle}'\007'
+
+	# Bye, Felicia!
+	prune_la_files
 }
 
 ## Install/Setup CrossTool-NG
@@ -64,7 +103,7 @@ Build_CT-NG() {
 	mkdir -p CT-NG
 	cd CT-NG
 	# Pull our own CT-NG branch, which includes a few tweaks needed to support truly old glibc & kernel versions...
-	git clone -b 1.23-kindle https://github.com/NiLuJe/crosstool-ng.git .
+	git clone -b 1.23-kindle --single-branch --depth 1 https://github.com/NiLuJe/crosstool-ng.git .
 	# This also often includes the latest Linaro GCC versions...
 	# But, more generally,
 	# This includes the Make-3.82 patch to Glibc 2.9 too, because it fails to build in softfp with make 3.81... -_-" [Cf. http://lists.gnu.org/archive/html/help-make/2012-02/msg00025.html]
@@ -82,10 +121,16 @@ Build_CT-NG() {
 	# NOTE: We also still currently need to backport https://git.linaro.org/toolchain/gcc.git/commitdiff/a26dad6a5955ed8574efc8d149faca3963a48d46 in Linaro GCC (ISL-0.15 handling for Graphite)...
 	# NOTE: The glibc 2.15 stuff currently doesn't apply to the 1.23-kindle branch, since upstream appears to have massaged glibc 2.15 into submission for the 1.23.0 release, which this branch is based on ;).
 
-	# FIXME: Something is very, very wrong with my Linaro 2016.01 builds: everything segfaults on start (in __libc_csu_init).
-	# FIXME: Progress! With the 2016.02 & 2016.03 snapshots, as well as the 2016.02 release, it SIGILLs (in _init/call_gmon_start)...
-	# FIXME: Building the PW2 TC against glibc 2.19, on the other hand, results in working binaries... WTF?! (5.3 2016.03 snapshot)
+	# XXX: Something is very, very wrong with my Linaro 2016.01 builds: everything segfaults on start (in __libc_csu_init).
+	# XXX: Progress! With the 2016.02 & 2016.03 snapshots, as well as the 2016.02 release, it SIGILLs (in _init/call_gmon_start)...
+	# XXX: Building the PW2 TC against glibc 2.19, on the other hand, results in working binaries... WTF?! (5.3 2016.03 snapshot)
 	# NOTE: Joy? The issue appears to be fixed in Linaro GCC 5.3 2016.04 snapshot! :)
+
+	# FIXME: I'm seriously considering adding proper support for binutil's native handling of the LTO plugin, via lib/bfd-plugins, instead of relying on the GCC wrappers...
+	#        cd ${HOME}/x-tools/arm-kobo-linux-gnueabihf
+	#        mkdir -p lib/bfd-plugins
+	#        cd lib/bfd-plugins
+	#        ln -sf ../../libexec/gcc/arm-kobo-linux-gnueabihf/7.3.1/liblto_plugin.so.0.0.0 liblto_plugin.so
 
 	./bootstrap
 	./configure --prefix=${HOME}/Kindle/CrossTool
@@ -108,11 +153,13 @@ Build_CT-NG() {
 
 		# Start by removing the old TC...
 		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi
+		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf
 		# Then backup the current one...
 		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabi" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabi
+		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabihf" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabihf
 
 		# Clean the WD manually (clean & distclean are both a little bit too enthusiastic)
-		rm -rf build.log config .config.2 .config.old config.gen .build/arm-kindle-linux-gnueabi .build/arm-kindle5-linux-gnueabi .build/arm-kindlepw2-linux-gnueabi .build/arm-kobo-linux-gnueabi .build/src .build/tools
+		rm -rf build.log config .config.2 .config.old config.gen .build/arm-kindle-linux-gnueabi .build/arm-kindle5-linux-gnueabi .build/arm-kindlepw2-linux-gnueabi .build/arm-kobo-linux-gnueabi .build/arm-kobo-linux-gnueabihf .build/src .build/tools
 
 		# Get the current config for this TC...
 		cp ${SVN_ROOT}/Configs/trunk/Kindle/Misc/ct-ng-${my_tc}-config .config
@@ -145,10 +192,10 @@ Build_CT-NG() {
 	CPU: arm1136jf-s	|	cortex-a8	|	cortex-a9	# NOTE: Prefer setting CPU instead of Arch & Tune.
 	Tune: arm1136jf-s	|	cortex-a8	|	cortex-a9
 	FPU: vfp		|	neon or vfpv3
-	Floating point: softfp				# NOTE: Can't use hardf anymore, it requires the linux-armhf loader. Amazon never used interwork, and it's not as useful anymore with Thumb2. K5: I'm not sure Amazon defaults to Thumb2, but AFAICT we can use it safely.
+	Floating point: softfp				# NOTE: Can't use hardf, it requires a linux-armhf loader (also, terrible idea to mix ABIs). Interwork is meaningless on ARMv6+. K5: I'm not sure Amazon defaults to Thumb2, but AFAICT we can use it safely.
 	CFLAGS:		# Be very fucking conservative here, so, leave them empty to use the defaults (-O2 -pipe).... And, FWIW, don't use -ffast-math or -Ofast here, '#error "glibc must not be compiled with -ffast-math"' ;).
 	LDFLAGS:
-	Default instruction set mode:	arm	|	thumb
+	Default instruction set mode:	arm	|	thumb	# NOTE: While Thumb produces noticeably smaller code, that may come at the cost of a veeeeeery small performance hit. Or the better code density might give it a veeeeeery small performance edge ;).
 	Use EABI: [*]
 
 	* TC >
@@ -240,25 +287,30 @@ esac
 #	cave resolve -x rar
 #	cave resolve p7zip rar python-swiftclient python-keystoneclient
 #
-# For... something:
+#	emerge -a lbzip2 pigz dev-perl/File-MimeInfo kindletool svn2cl rar p7zip python-swiftclient python-keystoneclient
+#
+# For harfbuzz:
 #	cave resolve -1 ragel gobject-introspection-common -x
+#
+#	emerge -a ragel gobject-introspection-common
 #
 # For OpenSSH & co:
 #	mkdir -p /mnt/onboard/.niluje/usbnet && mkdir -p /mnt/us/usbnet && chown -cvR niluje:users /mnt/us && chown -cvR niluje:users /mnt/onboard
 #
-# For Python (set main Python interpreter to 2.7):
-#	eselect python set 1
-#
 # For Python 3rd party modules:
 #	cave resolve -x distutilscross
+#
+#	emerge -a distutilscross
 #
 # For FC:
 #	cave resolve -x dev-python/lxml (for fontconfig)
 #
+#	emerge -a dev-python/lxml
+#
 # To fetch everything:
-#	cave resolve -1 -z -f -x sys-libs/zlib expat freetype harfbuzz fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0.9.8 dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo imagemagick bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb --uninstalls-may-break '*/*'
+#	cave resolve -1 -z -f -x sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0.9.8 dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb --uninstalls-may-break '*/*'
 #	OR
-#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0.9.8 dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo imagemagick bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb
+#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0.9.8 dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb
 #
 ##
 
@@ -304,8 +356,10 @@ case ${KINDLE_TC} in
 		fi
 
 		## NOTE: When linking dynamically, disable GCC 4.3/Glibc 2.8 fortify & stack-smashing protection support to avoid pulling symbols requiring GLIBC_2.8 or GCC_4.3
-		BASE_CFLAGS="-O2 -ffast-math ${ARCH_FLAGS} ${ARM_NO_UNALIGNED_ACCESS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin -fno-stack-protector -U_FORTIFY_SOURCE"
-		NOLTO_CFLAGS="-O2 -ffast-math ${ARCH_FLAGS} ${ARM_NO_UNALIGNED_ACCESS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -fno-stack-protector -U_FORTIFY_SOURCE"
+		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${ARM_NO_UNALIGNED_ACCESS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin -fno-stack-protector -U_FORTIFY_SOURCE"
+		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${ARM_NO_UNALIGNED_ACCESS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -fno-stack-protector -U_FORTIFY_SOURCE"
+		## Here be dragons!
+		RICE_CFLAGS="-O3 -ffast-math -ftree-vectorize -funroll-loops ${ARCH_FLAGS} ${ARM_NO_UNALIGNED_ACCESS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin -fno-stack-protector -U_FORTIFY_SOURCE"
 
 		## NOTE: And here comes another string of compatibility related tweaks...
 		# We don't have mkostemp on Glibc 2.5... ;) (fontconfig)
@@ -325,6 +379,12 @@ case ${KINDLE_TC} in
 		export ac_cv_header_sys_timerfd_h=no
 		export ac_cv_func_eventfd=no
 		export ac_cv_header_sys_eventfd_h=no
+		## NOTE: The Glade guys built a tool to automate the symver approach to at worst detecting, at best handling the "build for an earlier glibc ABI" situation ;).
+		#        It's called LibcWrapGenerator, and the libcwrap-kindle.h header in this repo was built with it.
+		#        You basically pass it to every GCC call via -include (via a CC override instead of CPPFLAGS to deal with the largest amount of stupid buildsystems).
+		#        It's not perfect: it won't help you automagically avoid *new* or *variant* symbols for instance, but it'll at least make it very explicit with a linker failure,
+		#        instead of having to check everything later via readelf!
+		#        c.f., https://gitlab.gnome.org/GNOME/glade/blob/master/build/linux/README for more info.
 
 
 		## NOTE: Check if LTO still horribly breaks some stuff...
@@ -346,8 +406,9 @@ case ${KINDLE_TC} in
 		#BASE_LDFLAGS="${BASE_CFLAGS} ${BASE_LDFLAGS}"
 		export LDFLAGS="${BASE_LDFLAGS}"
 
-		# NOTE: Use the gold linker
-		export CTNG_LD_IS="gold"
+		# NOTE: We're no longer using the gold linker by default...
+		# FIXME: Because for some mysterious reason, gold + LTO leads to an unconditional dynamic link against libgcc_s (uless -static-libgcc is passed, of course).
+		export CTNG_LD_IS="bfd"
 
 		## NOTE: We jump through terrible hoops to counteract libtool's stripping of 'unknown' or 'harmful' FLAGS... (cf. https://www.gnu.org/software/libtool/manual/html_node/Stripped-link-flags.html)
 		## That's a questionable behavior that is bound to screw up LTO in fun and interesting ways, at the very least on the performance aspect of things...
@@ -363,6 +424,9 @@ case ${KINDLE_TC} in
 		export PKG_CONFIG_DIR=
 		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
+
+		## CMake is hell.
+		export CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPTS_BASE_DIR}/CMakeCross.txt -DCMAKE_INSTALL_PREFIX=${TC_BUILD_DIR}"
 
 		DEVICE_USERSTORE="/mnt/us"
 	;;
@@ -386,6 +450,9 @@ case ${KINDLE_TC} in
 
 		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
 		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb"
+		## Here be dragons!
+		RICE_CFLAGS="-O3 -ffast-math -ftree-vectorize -funroll-loops ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
+
 		## NOTE: Check if LTO still horribly breaks some stuff...
 		## NOTE: See https://gcc.gnu.org/gcc-4.9/changes.html for the notes about building LTO-enabled static libraries... (gcc-ar/gcc-ranlib)
 		## NOTE: And see https://gcc.gnu.org/gcc-5/changes.html to rejoice because we don't have to care about broken build-systems with mismatched compile/link time flags anymore :).
@@ -405,8 +472,9 @@ case ${KINDLE_TC} in
 		#BASE_LDFLAGS="${BASE_CFLAGS} ${BASE_LDFLAGS}"
 		export LDFLAGS="${BASE_LDFLAGS}"
 
-		# NOTE: Use the gold linker
-		export CTNG_LD_IS="gold"
+		# NOTE: We're no longer using the gold linker by default...
+		# FIXME: Because for some mysterious reason, gold + LTO leads to an unconditional dynamic link against libgcc_s (uless -static-libgcc is passed, of course).
+		export CTNG_LD_IS="bfd"
 
 		## NOTE: We jump through terrible hoops to counteract libtool's stripping of 'unknown' or 'harmful' FLAGS... (cf. https://www.gnu.org/software/libtool/manual/html_node/Stripped-link-flags.html)
 		## That's a questionable behavior that is bound to screw up LTO in fun and interesting ways, at the very least on the performance aspect of things...
@@ -422,6 +490,9 @@ case ${KINDLE_TC} in
 		export PKG_CONFIG_DIR=
 		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
+
+		## CMake is hell.
+		export CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPTS_BASE_DIR}/CMakeCross.txt -DCMAKE_INSTALL_PREFIX=${TC_BUILD_DIR}"
 
 		DEVICE_USERSTORE="/mnt/us"
 	;;
@@ -445,8 +516,10 @@ case ${KINDLE_TC} in
 
 		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
 		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb"
+		## Here be dragons!
+		RICE_CFLAGS="-O3 -ffast-math -ftree-vectorize -funroll-loops ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
 
-		## FIXME: Crazy compat flags if the TC has been built against glibc 2.19...
+		## XXX: Crazy compat flags if the TC has been built against glibc 2.19...
 		##	Why would we do that? Because since FW 5.6.5, that's actually the glibc version used, and, more importantly,
 		##	it was part of an experiment: with the apparently broken Linaro 5.3 snapshots from 2016.01 to 2016.3, a TC built against glibc 2.19 would work, instead of silently generating broken code...
 		## NOTE: The root issue was fixed in Linaro 5.3 2016.04, which makes that whole experiment an archeological relic ;).
@@ -462,7 +535,7 @@ case ${KINDLE_TC} in
 			# __fdelt_chk@GLIBC_2.15 on USBNetwork/src/usbnet/bin/mosh-* & OpenSSH
 			# __poll_chk@GLIBC_2.16 on OpenSSH
 			# NOTE: Requires killing FORTIFY_SOURCE... We do it on site w/ a KINDLE_TC_IS_GLIBC_219 check.
-			# FIXME: Don't forget to kill those stray checks if I ever get rid of this monstrosity...
+			# XXX: Don't forget to kill those stray checks if I ever get rid of this monstrosity...
 			# clock_gettime@GLIBC_2.17 on USBNetwork/src/usbnet/bin/mosh-* & OpenSSH & USBNetwork/src/usbnet/bin/sshfs
 			# NOTE: This one is particular in that the function existed, it was just in librt instead of libc ;).
 			export ac_cv_search_clock_gettime="-lrt"
@@ -489,8 +562,9 @@ case ${KINDLE_TC} in
 		#BASE_LDFLAGS="${BASE_CFLAGS} ${BASE_LDFLAGS}"
 		export LDFLAGS="${BASE_LDFLAGS}"
 
-		# NOTE: Use the gold linker
-		export CTNG_LD_IS="gold"
+		# NOTE: We're no longer using the gold linker by default...
+		# FIXME: Because for some mysterious reason, gold + LTO leads to an unconditional dynamic link against libgcc_s (uless -static-libgcc is passed, of course).
+		export CTNG_LD_IS="bfd"
 
 		## NOTE: We jump through terrible hoops to counteract libtool's stripping of 'unknown' or 'harmful' FLAGS... (cf. https://www.gnu.org/software/libtool/manual/html_node/Stripped-link-flags.html)
 		## That's a questionable behavior that is bound to screw up LTO in fun and interesting ways, at the very least on the performance aspect of things...
@@ -507,11 +581,14 @@ case ${KINDLE_TC} in
 		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
+		## CMake is hell.
+		export CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPTS_BASE_DIR}/CMakeCross.txt -DCMAKE_INSTALL_PREFIX=${TC_BUILD_DIR}"
+
 		DEVICE_USERSTORE="/mnt/us"
 	;;
 	KOBO )
 		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
-		CROSS_TC="arm-kobo-linux-gnueabi"
+		CROSS_TC="arm-kobo-linux-gnueabihf"
 		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 
 		# Export it for our CMakeCross TC file
@@ -529,6 +606,9 @@ case ${KINDLE_TC} in
 
 		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
 		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb"
+		## Here be dragons!
+		RICE_CFLAGS="-O3 -ffast-math -ftree-vectorize -funroll-loops ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
+
 		## NOTE: Check if LTO still horribly breaks some stuff...
 		## NOTE: See https://gcc.gnu.org/gcc-4.9/changes.html for the notes about building LTO-enabled static libraries... (gcc-ar/gcc-ranlib)
 		## NOTE: And see https://gcc.gnu.org/gcc-5/changes.html to rejoice because we don't have to care about broken build-systems with mismatched compile/link time flags anymore :).
@@ -548,8 +628,9 @@ case ${KINDLE_TC} in
 		#BASE_LDFLAGS="${BASE_CFLAGS} ${BASE_LDFLAGS}"
 		export LDFLAGS="${BASE_LDFLAGS}"
 
-		# NOTE: Use the gold linker
-		export CTNG_LD_IS="gold"
+		# NOTE: We're no longer using the gold linker by default...
+		# FIXME: Because for some mysterious reason, gold + LTO leads to an unconditional dynamic link against libgcc_s (uless -static-libgcc is passed, of course).
+		export CTNG_LD_IS="bfd"
 
 		## NOTE: We jump through terrible hoops to counteract libtool's stripping of 'unknown' or 'harmful' FLAGS... (cf. https://www.gnu.org/software/libtool/manual/html_node/Stripped-link-flags.html)
 		## That's a questionable behavior that is bound to screw up LTO in fun and interesting ways, at the very least on the performance aspect of things...
@@ -565,6 +646,9 @@ case ${KINDLE_TC} in
 		export PKG_CONFIG_DIR=
 		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
+
+		## CMake is hell.
+		export CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPTS_BASE_DIR}/CMakeCross.txt -DCMAKE_INSTALL_PREFIX=${TC_BUILD_DIR}"
 
 		# Kobos are finnicky as hell, so take some more precautions...
 		# On the vfat partition, don't use the .kobo folder, since it might go poof with no warning in case of troubles...
@@ -598,6 +682,8 @@ if [[ "${2}" == "env" ]] ; then
 		unset PKG_CONFIG_DIR
 		unset PKG_CONFIG_PATH
 		unset PKG_CONFIG_LIBDIR
+		# We have our own CMake shenanigans
+		unset CMAKE
 		# We also don't want to look at or pick up our own custom sysroot, for fear of an API/ABI mismatch somewhere...
 		export CPPFLAGS="${CPPFLAGS/-isystem${TC_BUILD_DIR}\/include/}"
 		export LDFLAGS="${LDFLAGS/-L${TC_BUILD_DIR}\/lib /}"
@@ -610,39 +696,95 @@ if [[ "${2}" == "env" ]] ; then
 		# NOTE: And we want to link to libstdc++ statically...
 		export LDFLAGS="${LDFLAGS} -static-libstdc++"
 
-		# FIXME: Go back to GCC 4.9 for now, as CRe mysteriously breaks when built w/ Linaro GCC 5.2 2015.11-2...
+		# XXX: Go back to GCC 4.9 for now, as CRe mysteriously breaks when built w/ Linaro GCC 5.2 2015.11-2...
+		# NOTE: Now fixed in CRe ;).
 		#export PATH="${PATH/${CROSS_TC}/gcc49_${CROSS_TC}}"
-		# FIXME: Oh, joy. It also segfaults w/ Linaro GCC 4.9 2016.02...
+		# XXX: Oh, joy. It also segfaults w/ Linaro GCC 4.9 2016.02...
+		# NOTE: Because that was during the great 2016 snapshot breakening! :D
+	# As well as a no-sysroot version for standalone projects (i.e., KFMon)
+	elif [[ "${3}" == "bare" ]] ; then
+		echo "* Not using our custom sysroot! :)"
+		# We don't want to pull any of our own libs through pkg-config
+		unset PKG_CONFIG_DIR
+		unset PKG_CONFIG_PATH
+		unset PKG_CONFIG_LIBDIR
+		# We also don't want to look at or pick up anything from our own custom sysroot, to make sure vendoring works as intended in standalone projects
+		export CPPFLAGS="${CPPFLAGS/-isystem${TC_BUILD_DIR}\/include/}"
+		export LDFLAGS="${LDFLAGS/-L${TC_BUILD_DIR}\/lib /}"
+		# NOTE: We might also want to link to libgcc/libstdc++ statically...
+		#export LDFLAGS="${LDFLAGS} -static-libgcc"
+		#export LDFLAGS="${LDFLAGS} -static-libstdc++"
 	fi
 
 	# And return happy now :)
 	return 0
-
 fi
 
 ## Get to our build dir
 mkdir -p "${TC_BUILD_DIR}"
 cd "${TC_BUILD_DIR}"
 
+## Clear local userstore...
+if [[ -n "${DEVICE_USERSTORE}" ]] && [[ -d "${DEVICE_USERSTORE}" ]] ; then
+	rm -rfv ${DEVICE_USERSTORE}/*
+	# But re-create the USBNet directory, so that we actually install OpenSSH properly...
+	mkdir -p "${DEVICE_USERSTORE}/usbnet"
+fi
+
 ## And start building stuff!
 
 ## FT & FC for Fonts
-echo "* Building zlib . . ."
-echo ""
-ZLIB_SOVER="1.2.11"
-tar -I pigz -xvf /usr/portage/distfiles/zlib-1.2.11.tar.gz
-cd zlib-1.2.11
-update_title_info
-# On ARMv7, apply a few patches w/ hand-crafted SIMD ASM (from https://github.com/kaffeemonster/zlib & https://bugzilla.mozilla.org/show_bug.cgi?id=462796)
-#if [[ "${KINDLE_TC}" != "K3" ]] ; then
-#	# NOTE: So far, results on the workflows I care about (fbgrab & ImageMagick) are mostly inexistant in terms of performance gain, so...
-#	#       Not really feeling heartbroken at them not having landed upstream in nearly 3 years...
-#	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-1.2.8-simd.patch
-#fi
-./configure --shared --prefix=${TC_BUILD_DIR}
-make ${JOBSFLAGS}
-make install
-sed -i -r 's:\<(O[FN])\>:_Z_\1:g' ${TC_BUILD_DIR}/include/z*.h
+# XXX: Look into Dead2/zlib-ng?
+# XXX: Test gildor2/fast_zlib (c.f., ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-fast-zlib-longest_match.patch)?
+# NOTE: Very, very quick tests show that zlib-ng is faster with fbgrab (compression -1), while fast_zlib is faster w/ IM (quality 75). Yay?
+# NOTE: In fact, zlib-ng is potentially slower than vanilla in my IM use-case...
+# FIXME: With *both* (i.e., zlib-ng + ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-ng-fast-zlib-longest_match.patch), fbgrab is fastest, and IM is between def and fast.
+#       ... but I'm seeing corruption in fbgrab snaps... This is why we can't have nice thing :(.
+#
+# NOTE: Try going with zlib-ng, it at least has slightly more following than fast_zlib...
+USE_ZLIB_NG="true"
+if [[ "${USE_ZLIB_NG}" == "true" ]] ; then
+	echo "* Building zlib-ng . . ."
+	echo ""
+	ZLIB_SOVER="1.2.11.zlib-ng"
+	until git clone --depth 1 https://github.com/Dead2/zlib-ng.git ; do
+		rm -rf zlib-ng
+		sleep 15
+	done
+	cd zlib-ng
+	update_title_info
+	export CFLAGS="${RICE_CFLAGS}"
+	if [[ "${KINDLE_TC}" == "K3" ]] ; then
+		# No NEON, and no unaligned access!
+		sed -e 's/-DUNALIGNED_OK//g' -i configure
+		env CHOST="${CROSS_TC}" ./configure --shared --prefix=${TC_BUILD_DIR} --zlib-compat
+	else
+		env CHOST="${CROSS_TC}" ./configure --shared --prefix=${TC_BUILD_DIR} --zlib-compat --neon
+	fi
+	make ${JOBSFLAGS}
+	make install
+	export CFLAGS="${BASE_CFLAGS}"
+	# NOTE: No need to sanitize the headers
+else
+	echo "* Building zlib . . ."
+	echo ""
+	ZLIB_SOVER="1.2.11"
+	tar -I pigz -xvf /usr/portage/distfiles/zlib-1.2.11.tar.gz
+	cd zlib-1.2.11
+	patch -p1 < /usr/portage/sys-libs/zlib/files/zlib-1.2.11-fix-deflateParams-usage.patch
+	patch -p1 < /usr/portage/sys-libs/zlib/files/zlib-1.2.11-minizip-drop-crypt-header.patch
+	update_title_info
+	# On ARMv7, apply a few patches w/ hand-crafted SIMD ASM (from https://github.com/kaffeemonster/zlib & https://bugzilla.mozilla.org/show_bug.cgi?id=462796)
+	#if [[ "${KINDLE_TC}" != "K3" ]] ; then
+	#	# NOTE: So far, results on the workflows I care about (fbgrab & ImageMagick) are mostly inexistant in terms of performance gain, so...
+	#	#       Not really feeling heartbroken at them not having landed upstream in nearly 3 years...
+	#	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-1.2.8-simd.patch
+	#fi
+	./configure --shared --prefix=${TC_BUILD_DIR}
+	make ${JOBSFLAGS}
+	make install
+	sed -i -r 's:\<(O[FN])\>:_Z_\1:g' ${TC_BUILD_DIR}/include/z*.h
+fi
 # Install the shared libs for USBNet & ScreenSavers
 cp ../lib/libz.so.${ZLIB_SOVER} ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libz.so.${ZLIB_SOVER%%.*}
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libz.so.${ZLIB_SOVER%%.*}
@@ -657,23 +799,22 @@ fi
 echo "* Building expat . . ."
 echo ""
 cd ..
-EXPAT_SOVER="1.6.2"
-tar -I lbzip2 -xvf /usr/portage/distfiles/expat-2.2.0.tar.bz2
-cd expat-2.2.0
-patch -p2 < /usr/portage/dev-libs/expat/files/expat-2.1.1-CVE-2016-0718-regression.patch
+EXPAT_SOVER="1.6.8"
+tar -I lbzip2 -xvf /usr/portage/distfiles/expat-2.2.6.tar.bz2
+cd expat-2.2.6
 update_title_info
-# Fix Makefile for LTO...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/expat-fix-Makefile-for-lto.patch
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-docbook
 make ${JOBSFLAGS}
 make install
 
 ## NOTE: This is called from a function because we need to do two sets of builds in the same TC run to handle a weird, but critical issue with GCC 5 on the K4...
+## NOTE: The shitty news is that it still happens with Linaro 7.2 2017.11 & binutils 2.30... :(
 Build_FreeType_Stack() {
 	## HarfBuzz for FT's authinter
 	# Funnily enough, it depends on freetype too...
-	FT_VER="2.7_p20161001"
-	FT_SOVER="6.12.6"
+	# FIXME: I *may* need to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512
+	FT_VER="2.9.1_p20180512"	# 2.9.1_p20181007
+	FT_SOVER="6.16.1"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
 	cd ..
@@ -685,24 +826,35 @@ Build_FreeType_Stack() {
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-fix-Makefile-for-lto.patch
 	## minimal
 	sh autogen.sh
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --without-harfbuzz --without-png
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --without-harfbuzz --without-png --disable-freetype-config
 	make ${JOBSFLAGS}
 	make install
+	# NOTE: Because libtool is the pits, we rely on our prune_la_files helper (folded into update_title_info) to get rid of installed .la files.
+	#       In practical terms, this prevents libtool from expanding -llib flags into absolute/path/lib.so for libraries linked w/ libtool.
+	#       Because besides being blatantly insane on modern systems, in the specific instance of freetype & harfbuzz, which are in the peculiar position of being circular dependencies,
+	#       that would generate a final freetype library with a freetype DT_NEEDED entry... >_<"
 
 	echo "* Building harfbuzz . . ."
 	echo ""
 	cd ..
-	rm -rf harfbuzz
-	HB_SOVER="0.10302.0"
-	tar -xvJf /usr/portage/distfiles/harfbuzz-1.3.2_p20161004.tar.xz
-	cd harfbuzz
+	HB_SOVER="0.10900.0"
+	#rm -rf harfbuzz
+	#tar -xvJf /usr/portage/distfiles/harfbuzz-1.8.5_p20180802.tar.xz
+	#cd harfbuzz
+	rm -rf harfbuzz-1.9.0
+	tar -xvjf /usr/portage/distfiles/harfbuzz-1.9.0.tar.bz2
+	cd harfbuzz-1.9.0
 	update_title_info
-	env NOCONFIGURE="true" sh autogen.sh
+	env NOCONFIGURE=1 sh autogen.sh
 	# Make sure libtool doesn't eat any our of our CFLAGS when linking...
 	export AM_LDFLAGS="${XC_LINKTOOL_CFLAGS}"
+	export CXXFLAGS="${BASE_CFLAGS} -std=c++14 -Wno-narrowing"
+	# NOTE: Needed to properly link FT... For some reason gold did not care, while bfd does...
+	export PKG_CONFIG="pkg-config --static"
 	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-coretext --without-uniscribe --without-cairo --without-glib --without-gobject --without-graphite2 --without-icu --disable-introspection --with-freetype
 	make ${JOBSFLAGS} V=1
 	make install
+	export CXXFLAGS="${BASE_CFLAGS}"
 	unset AM_LDFLAGS
 	# Install the shared version, to avoid the circular dep FT -> HB -> FT...
 	cp ../lib/libharfbuzz.so.${HB_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/libharfbuzz.so.${HB_SOVER%%.*}
@@ -712,6 +864,7 @@ Build_FreeType_Stack() {
 		cp ../lib/libharfbuzz.so.${HB_SOVER} ${BASE_HACKDIR}/ScreenSavers/src/linkss/lib/libharfbuzz.so.${HB_SOVER%%.*}
 		${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/ScreenSavers/src/linkss/lib/libharfbuzz.so.${HB_SOVER%%.*}
 	fi
+	unset PKG_CONFIG
 
 	## FIXME: Should we link against a static libz for perf/stability? (So far, no issues, and no symbol versioning mishap either, but then again, it's only used for compressed PCF font AFAIR).
 	echo "* Building freetype . . ."
@@ -732,7 +885,7 @@ Build_FreeType_Stack() {
 	## NOTE: Let's try to break everything! AA to 16 shades of grey intead of 256. Completely destroys the rendering on my box, doesn't seem to have any effect on my K5 :?.
 	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-kindle-num_grays-16.patch
 	sh autogen.sh
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png --disable-freetype-config
 	make ${JOBSFLAGS}
 	make install
 	cp ../lib/libfreetype.so.${FT_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/autohint/libfreetype.so
@@ -746,12 +899,10 @@ Build_FreeType_Stack() {
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-fix-Makefile-for-lto.patch
 	## Always force light grey hinting (light hinting implicitly forces autohint) unless we asked for monochrome rendering (ie. in some popups & address bars, if we don't take this into account, these all render garbled glyphs)
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-2.4.9-kindle-force-light.patch
-	## Let's try the experimental autofit warper too, since it's only enabled with LIGHT :)
-	sed -e 's/module->warping           = 0;/module->warping           = 1;/' -i src/autofit/afmodule.c
 	#patch -p1 < /usr/portage/media-libs/freetype/files/freetype-2.7-enable-valid.patch
 	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-kindle-num_grays-16.patch
 	sh autogen.sh
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png --disable-freetype-config
 	make ${JOBSFLAGS}
 	make install
 	cp ../lib/libfreetype.so.${FT_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/light/libfreetype.so
@@ -774,9 +925,9 @@ Build_FreeType_Stack() {
 	sed -i -e "/^#define TT_CONFIG_OPTION_SUBPIXEL_HINTING[[:blank:]]*/ { s:^:/* :; s:$: */: }" include/freetype/config/ftoption.h
 	sed -i -e "/#define TT_CONFIG_OPTION_SUBPIXEL_HINTING[[:blank:]]*2/a #define TT_CONFIG_OPTION_SUBPIXEL_HINTING 2" include/freetype/config/ftoption.h
 	## Haha. LCD filter. Hahahahahaha.
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-2.6.2-spr-fir-filter-weight-to-gibson-coeff.patch
+	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-2.6.2-spr-fir-filter-weight-to-gibson-coeff.patch
 	sh autogen.sh
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png --disable-freetype-config
 	make ${JOBSFLAGS}
 	make install
 	cp ../lib/libfreetype.so.${FT_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/spr/libfreetype.so
@@ -793,7 +944,7 @@ Build_FreeType_Stack() {
 	#patch -p1 < /usr/portage/media-libs/freetype/files/freetype-2.7-enable-valid.patch
 	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/freetype-kindle-num_grays-16.patch
 	sh autogen.sh
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-bzip2 --with-harfbuzz --without-png --disable-freetype-config
 	make ${JOBSFLAGS}
 	make install
 	cp ../lib/libfreetype.so.${FT_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/bci/libfreetype.so
@@ -830,9 +981,12 @@ Build_FreeType_Stack() {
 	export LDFLAGS="${BASE_LDFLAGS}"
 }
 
-## FIXME: Apparently, when using an FT override built with GCC 5 (at least Linaro 5.2 2015.09), the framework will crash and fail to start on legacy devices (<= K4), which is bad.
+## FIXME: Apparently, when using an FT override built with GCC >= 5 (at least Linaro 5.2 2015.09), the framework will crash and fail to start on legacy devices (<= K4), which is bad.
 ##        To avoid breaking stuff, use an older GCC 4.9 (Linaro 2015.06) TC, at least for the K3 & K5 builds.
 ##        AFAICT, it appears to work fine on anything running FW 5.x, though (even a Kindle Touch), so don't do anything special with the PW2 builds.
+## NOTE:  Still happening with Linaro 7.2 2017.11 & binutils 2.30. :(
+##        Building the full FT stack with -static-libgcc doesn't help.
+##        So we're currently using Linaro 4.9 2017.01 & binutils 2.30...
 if [[ "${KINDLE_TC}" == "K3" ]] || [[ "${KINDLE_TC}" == "K5" ]] ; then
 	temp_nogcc5="true"
 	export PATH="${PATH/${CROSS_TC}/gcc49_${CROSS_TC}}"
@@ -860,23 +1014,52 @@ if [[ "${temp_nogcc5}" == "true" ]] ; then
 	fi
 fi
 
+## Build util-linux (for libuuid, needed by fontconfig)
+echo "* Building util-linux . . ."
+echo ""
+cd ..
+tar -xvJf /usr/portage/distfiles/util-linux-2.32.1.tar.xz
+cd util-linux-2.32.1
+update_title_info
+patch -p1 < /usr/portage/sys-apps/util-linux/files/util-linux-2.32-add-missing-lintl.patch
+touch -r configure libsmartcols/src/Makemodule.am
+touch -r configure libuuid/src/Makemodule.am
+sed -i -E \
+	-e '/NCURSES_/s:(ncursesw?)[56]-config:$PKG_CONFIG \1:' \
+	-e 's:(ncursesw?)[56]-config --version:$PKG_CONFIG --exists --print-errors \1:' \
+	configure
+libtoolize
+export scanf_cv_alloc_modifier=ms
+# FIXME: bfd insists on libuuid being built PIC...
+if [[ "${CTNG_LD_IS}" == "bfd" ]] ; then
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-makeinstall-chown --disable-makeinstall-setuid --without-python --without-readline --without-slang --without-systemd --without-udev --without-ncursesw --without-ncurses --enable-widechar --without-selinux --without-tinfo --disable-all-programs --disable-bash-completion --without-systemdsystemunitdir --enable-libuuid --disable-libblkid --disable-libsmartcols --disable-libfdisk --disable-libmount --with-pic
+else
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-makeinstall-chown --disable-makeinstall-setuid --without-python --without-readline --without-slang --without-systemd --without-udev --without-ncursesw --without-ncurses --enable-widechar --without-selinux --without-tinfo --disable-all-programs --disable-bash-completion --without-systemdsystemunitdir --enable-libuuid --disable-libblkid --disable-libsmartcols --disable-libfdisk --disable-libmount
+fi
+make ${JOBSFLAGS}
+make install
+unset scanf_cv_alloc_modifier
+
 ## Build FC
 echo "* Building fontconfig . . ."
 echo ""
-FC_SOVER="1.9.2"
-FC_VER="2.12.1_p20160911"
+FC_SOVER="1.12.0"
+FC_VER="2.13.1_p20181001"
 cd ..
 tar -xvJf /usr/portage/distfiles/fontconfig-${FC_VER}.tar.xz
 cd fontconfig
 update_title_info
 # Fix Makefile for LTO...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/fontconfig-fix-Makefile-for-lto.patch
-patch -p1 < /usr/portage/media-libs/fontconfig/files/fontconfig-2.11.93-latin-update.patch
+patch -p1 < /usr/portage/media-libs/fontconfig/files/fontconfig-2.12.3-latin-update.patch
 patch -p1 < /usr/portage/media-libs/fontconfig/files/fontconfig-2.10.2-docbook.patch
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/fontconfig-2.10.0-do-not-deprecate-dotfile.patch
 # NOTE: Pick-up our own expat via rpath, we're using expat 2.1.0, the Kindle is using 2.0.0 (and it's not in the tree anymore). Same from FT & HB.
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/linkfonts/lib"
-sh autogen.sh --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --disable-docs --disable-docbook --localstatedir=/var --with-templatedir=/etc/fonts/conf.avail --with-baseconfigdir=/etc/fonts --with-xmldir=/etc/fonts --with-arch=arm --with-expat=${TC_BUILD_DIR}
+# NOTE: Needed to properly link FT...
+export PKG_CONFIG="pkg-config --static"
+env NOCONFIGURE=1 sh autogen.sh
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --disable-docs --disable-docbook --localstatedir=/var --with-templatedir=/etc/fonts/conf.avail --with-baseconfigdir=/etc/fonts --with-xmldir=/etc/fonts --with-arch=arm --with-expat=${TC_BUILD_DIR}
 make ${JOBSFLAGS} V=1
 make install-exec
 make install-pkgconfigDATA
@@ -886,13 +1069,19 @@ cp ../lib/libexpat.so.${EXPAT_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/lib
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/libexpat.so.${EXPAT_SOVER%%.*}
 cp ../lib/libz.so.${ZLIB_SOVER} ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/libz.so.${ZLIB_SOVER%%.*}
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Fonts/src/linkfonts/lib/libz.so.${ZLIB_SOVER%%.*}
-## FIXME: Keep a copy of the shared version, to check if it behaves...
+## NOTE: Keep a copy of the shared version, to check if it behaves...
 cp ../bin/fc-scan ${BASE_HACKDIR}/Fonts/src/linkfonts/bin/shared_fc-scan
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Fonts/src/linkfonts/bin/shared_fc-scan
 
-## FIXME: And then build it statically (at least as far as libfontconfig is concerned) for fc-scan,
-## because for some unknown and baffling reason, linking it dynamically leaves us with a binary that loops forever,
-## which horribly breaks the boot on legacy devices when the KF8 support is enabled in the fonts hack...
+## XXX: And then build it statically (at least as far as libfontconfig is concerned) for fc-scan,
+##      because for some unknown and baffling reason, linking it dynamically leaves us with a binary that loops forever,
+##      which horribly breaks the boot on legacy devices when the KF8 support is enabled in the fonts hack...
+## NOTE: Historically, there was also apparently weird semi-random segfaults (c.f., http://trac.ak-team.com/trac/changeset/7146/niluje).
+##       But given the age of said commit (8 years!), I really can't remember the details...
+##       After that, during the switch to LTO, the consistent looping issue appeared.
+##       I just happened to quickly re-check a current binary, on a K4, built after the prune_la_files fix (Linaro 7.2 2017.11, binutils 2.30),
+##       and I saw neither issues...
+##       But given the history, and the finicky nature of this crap, let's keep that workaround in...
 cd ..
 rm -rf fontconfig
 tar -xvJf /usr/portage/distfiles/fontconfig-${FC_VER}.tar.xz
@@ -900,12 +1089,11 @@ cd fontconfig
 update_title_info
 # Fix Makefile for LTO...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/fontconfig-fix-Makefile-for-lto.patch
-patch -p1 < /usr/portage/media-libs/fontconfig/files/fontconfig-2.11.93-latin-update.patch
+patch -p1 < /usr/portage/media-libs/fontconfig/files/fontconfig-2.12.3-latin-update.patch
 patch -p1 < /usr/portage/media-libs/fontconfig/files/fontconfig-2.10.2-docbook.patch
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/fontconfig-2.10.0-do-not-deprecate-dotfile.patch
-# Needed to properly link FT...
-export PKG_CONFIG="pkg-config --static"
-sh autogen.sh --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-docs --disable-docbook --localstatedir=/var --with-templatedir=/etc/fonts/conf.avail --with-baseconfigdir=/etc/fonts --with-xmldir=/etc/fonts --with-arch=arm --with-expat=${TC_BUILD_DIR}
+env NOCONFIGURE=1 sh autogen.sh
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-docs --disable-docbook --localstatedir=/var --with-templatedir=/etc/fonts/conf.avail --with-baseconfigdir=/etc/fonts --with-xmldir=/etc/fonts --with-arch=arm --with-expat=${TC_BUILD_DIR}
 make ${JOBSFLAGS} V=1
 make install-exec
 make install-pkgconfigDATA
@@ -922,21 +1110,16 @@ unset PKG_CONFIG
 echo "* Building coreutils . . ."
 echo ""
 cd ..
-tar xvJf /usr/portage/distfiles/coreutils-8.25.tar.xz
-cd coreutils-8.25
+tar xvJf /usr/portage/distfiles/coreutils-8.30.tar.xz
+cd coreutils-8.30
 update_title_info
-tar xvJf /usr/portage/distfiles/coreutils-8.25-patches-1.0.tar.xz
+tar xvJf /usr/portage/distfiles/coreutils-8.30-patches-01.tar.xz
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	## Dirty hack to avoid pulling the __sched_cpucount@GLIBC_2.6 symbol from <sched.h> in sort.c (through lib/nproc.c), since we only have glibc 2.5 on the target. (Needed since coreutils 8.6)
 	sed -e "s/CPU_COUNT/GLIBC_26_CPU_COUNT/g" -i lib/nproc.c
 fi
-rm -f patch/000_all_coreutils-i18n.patch patch/001_all_coreutils-gen-progress-bar.patch
 for patchfile in patch/*.patch ; do
-	if [ "${patchfile}" == "patch/050_all_coreutils-primes.patch" ] ; then
-		patch -p0 < ${patchfile}
-	else
-		patch -p1 < ${patchfile}
-	fi
+	patch -p1 < ${patchfile}
 done
 # Avoid (re)generating manpages...
 for my_man in man/*.x ; do
@@ -948,7 +1131,7 @@ export gl_cv_func_fstatat_zero_flag=yes
 export gl_cv_func_mknod_works=yes
 export gl_cv_func_working_mkstemp=yes
 # Some cross compilation tweaks lifted from http://cross-lfs.org/view/svn/x86_64-64/temp-system/coreutils.html
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-acl --disable-xattr --disable-libcap --enable-install-program=hostname
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-libcap --disable-nls --disable-acl --disable-xattr --without-gmp --enable-install-program=hostname
 make ${JOBSFLAGS} V=1
 make install
 unset fu_cv_sys_stat_statfs2_bsize
@@ -967,17 +1150,18 @@ echo "* Building libtommath . . ."
 echo ""
 cd ..
 rm -rf libtommath
-until git clone https://github.com/libtom/libtommath.git -b develop libtommath ; do
+until git clone -b develop --single-branch --depth 1 https://github.com/libtom/libtommath.git libtommath ; do
 	rm -rf libtommath
 	sleep 15
 done
 cd libtommath
 update_title_info
-export CFLAGS="${CPPFLAGS} ${BASE_CFLAGS}"
-sed -i -e '/CFLAGS += -O3 -funroll-loops/d' makefile.include
+# NOTE: Upstream force enables -funroll-loops, assume it's for a reason, so make it actually useful by combining it with ftree-vectorize
+export CFLAGS="${CPPFLAGS} ${RICE_CFLAGS}"
+sed -i -e '/CFLAGS += -O3 -funroll-loops/d' makefile_include.mk
 sed -i -e 's/-O3//g' etc/makefile
 sed -i -e 's/-funroll-loops//g' etc/makefile
-make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" INCPATH=${TC_BUILD_DIR}/include LIBPATH=${TC_BUILD_DIR}/lib
+make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" INCPATH=${TC_BUILD_DIR}/include LIBPATH=${TC_BUILD_DIR}/lib V=1
 make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" INCPATH=${TC_BUILD_DIR}/include LIBPATH=${TC_BUILD_DIR}/lib INSTALL_USER=$(id -u) INSTALL_GROUP=$(id -g) install
 export CFLAGS="${BASE_CFLAGS}"
 
@@ -985,55 +1169,69 @@ echo "* Building libtomcrypt . . ."
 echo ""
 cd ..
 rm -rf libtomcrypt
-git clone https://github.com/libtom/libtomcrypt.git -b develop libtomcrypt
+until git clone -b develop --single-branch https://github.com/libtom/libtomcrypt.git libtomcrypt ; do
+	rm -rf libtomcrypt
+	sleep 15
+done
 cd libtomcrypt
 update_title_info
+# FIXME: Peg a commit before the ECC API changes...
+#        ... At least until the dropbear changes (https://github.com/karel-m/dropbear/commits/new-libtomcrypt) get merged upstream.
+git checkout a528528a2b0bbce7f894c6b572611d80b9705ede
 # Enable the math descriptors for dropbear's ECC support
-export CFLAGS="${CPPFLAGS} -DUSE_LTM -DLTM_DESC ${BASE_CFLAGS}"
-sed -i -e '/CFLAGS += -O3 -funroll-loops/d' makefile.include
-# GCC doesn't like the name 'B0' for a variable, make it longer. (Breaks dropbear build later on)
-sed -i -e 's/B0/SB0/g' src/encauth/ccm/ccm_memory_ex.c src/headers/tomcrypt_mac.h
-make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm"
+export CFLAGS="${CPPFLAGS} -DUSE_LTM -DLTM_DESC ${RICE_CFLAGS}"
+sed -i -e '/CFLAGS += -O3 -funroll-loops/d' makefile_include.mk
+make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1
 make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" INCPATH=${TC_BUILD_DIR}/include LIBPATH=${TC_BUILD_DIR}/lib DATAPATH=${TC_BUILD_DIR}/share INSTALL_USER=$(id -u) INSTALL_GROUP=$(id -g) NODOCS=true install
 export CFLAGS="${BASE_CFLAGS}"
 
 echo "* Building dropbear . . ."
 echo ""
 cd ..
-tar -I lbzip2 -xvf /usr/portage/distfiles/dropbear-2016.74.tar.bz2
-cd dropbear-2016.74
+tar -I lbzip2 -xvf /usr/portage/distfiles/dropbear-2018.76.tar.bz2
+cd dropbear-2018.76
 update_title_info
 # NOTE: As mentioned earlier, on Kobos, let dropbear live in the internal memory to avoid trouble...
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	DEVICE_USERSTORE="${DEVICE_INTERNAL_USERSTORE}"
 fi
 # Update to latest git...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.74-upstream-catchup.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-upstream-catchup.patch
+# ...or just cherry-pick a few things. Right now, this is https://github.com/mkj/dropbear/commit/8d0b48f16550c9bf3693b2fa683f21e8276b1b1a (broken CFLAGS detection)
+#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-upstream-fixes.patch
+# ...or apply a few things that haven't even hit upstream yet ;).
+# This is https://github.com/mkj/dropbear/pull/61
+# tweaked a bit to play nice with the craptastically old glibc of the K3 TC
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-pr61.patch
+# This is https://github.com/karel-m/dropbear/commit/4530ff68975932680d674a33ea477fa7afc79ade
+# updated for https://github.com/libtom/libtomcrypt/pull/423
+# FIXME: Broken right now (Exit before auth: ECC error)
+#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-tomcrypt-1.19-compat.patch
 # Gentoo patches/tweaks
 patch -p0 < /usr/portage/net-misc/dropbear/files/dropbear-0.46-dbscp.patch
-sed -i -e "/SFTPSERVER_PATH/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/libexec/sftp-server\":" default_options.h.in default_options.h
+sed -i -e "/SFTPSERVER_PATH/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/libexec/sftp-server\":" default_options.h
 sed -i -e '/pam_start/s:sshd:dropbear:' svr-authpam.c
-sed -i -e "/DSS_PRIV_FILENAME/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/etc/dropbear_dss_host_key\":" -e "/RSA_PRIV_FILENAME/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/etc/dropbear_rsa_host_key\":" -e "/ECDSA_PRIV_FILENAME/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/etc/dropbear_ecdsa_host_key\":" default_options.h.in default_options.h
-sed -e 's%#define DROPBEAR_X11FWD 1%#define DROPBEAR_X11FWD 0%' -i default_options.h.in default_options.h
-sed -i -e "/DROPBEAR_PIDFILE/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/run/sshd.pid\":" default_options.h.in default_options.h
+sed -i -e "/DSS_PRIV_FILENAME/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/etc/dropbear_dss_host_key\":" -e "/RSA_PRIV_FILENAME/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/etc/dropbear_rsa_host_key\":" -e "/ECDSA_PRIV_FILENAME/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/etc/dropbear_ecdsa_host_key\":" default_options.h
+sed -e 's%#define DROPBEAR_X11FWD 1%#define DROPBEAR_X11FWD 0%' -i default_options.h
+sed -i -e "/DROPBEAR_PIDFILE/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/run/sshd.pid\":" default_options.h
 # This only affects the bundled libtom, but disable it anyway
-sed -e 's%#define DROPBEAR_SMALL_CODE 1%#define DROPBEAR_SMALL_CODE 0%' -i default_options.h.in default_options.h
+sed -e 's%#define DROPBEAR_SMALL_CODE 1%#define DROPBEAR_SMALL_CODE 0%' -i default_options.h
 # Moar crypto!
-sed -e 's%/\*#define DROPBEAR_BLOWFISH\*/%#define DROPBEAR_BLOWFISH 1%' -i default_options.h.in default_options.h
+sed -e 's%#define DROPBEAR_BLOWFISH 0%#define DROPBEAR_BLOWFISH 1%' -i default_options.h
+# We want our MOTD! It has critical information on Kindles!
+sed -e 's%#define DO_MOTD 0%#define DO_MOTD 1%' -i default_options.h
 # Ensure we have a full path, like with telnet, on Kobo devices, since ash doesn't take care of it for us...
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-	sed -e '/DEFAULT_PATH/s:".*":"/sbin\:/usr/sbin\:/bin\:/usr/bin":' -i default_options.h.in default_options.h
+	sed -e '/DEFAULT_PATH/s:".*":"/sbin\:/usr/sbin\:/bin\:/usr/bin":' -i default_options.h
 fi
 # Show /etc/issue (on Kindle only)
 if [[ "${KINDLE_TC}" != "KOBO" ]] ; then
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-show-issue.patch
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-show-issue.patch
 fi
 # No passwd...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-nopasswd-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-nopasswd-hack.patch
 # Pubkeys in ${DEVICE_USERSTORE}/usbnet/etc/authorized_keys & with perms checks curbed a bit
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-pubkey-hack.patch
-# Make sure the linking with 'system' libtom* is done properly (libtomcrypt depends on libtommath, so we need to end up with -ltomcrypt -ltommath, not the other way around)
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-fix-system-libtom.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-pubkey-hack.patch
 # Fix the Makefile so that LTO flags aren't dropped in the linking stage...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-fix-Makefile-for-lto.patch
 # Kill bundled libtom, we're using our own, from the latest develop branch
@@ -1045,11 +1243,25 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	sed -e "s#Kindle#Kobo#g" -i svr-authpasswd.c
 fi
 autoreconf -fi
+# Use the same CFLAGS as libtom*
+export CFLAGS="${RICE_CFLAGS}"
 # We now ship our own shared zlib, so let's use it
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-lastlog --enable-zlib --enable-openpty --enable-shadow --enable-syslog --disable-bundled-libtom
+#export CFLAGS="${BASE_CFLAGS/-ffast-math /}"
+# NOTE: Can't use FORTIFY_SOURCE on the K3... (with our general nerfs in place, that'd only pull a single offending symbol: __vasprintf_chk@GLIBC_2.8)
+if [[ "${KINDLE_TC}" == "K3" ]] ; then
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-lastlog --enable-zlib --enable-openpty --enable-shadow --enable-syslog --disable-bundled-libtom --disable-harden
+else
+	# FIXME: Since 2018.76, enabling hardening support is wonderfully broken on at least PW2 & Kobo: connection hangs on SSH2_MSG_KEX_ECDH_REPLY, and leaves a dropbear process hogging 100% CPU!
+	#        It *may* be CFLAGS related, since it only starts happening with https://github.com/mkj/dropbear/commit/8d0b48f16550c9bf3693b2fa683f21e8276b1b1a#diff-67e997bcfdac55191033d57a16d1408a
+	#        applied...
+	# NOTE:  This is also possibly related to the fact that it's the first release where hardening is enabled by default, and the culprit here might be PIE,
+	#        since we certainly don't build anything else PIE, and mixing PIE code with non-PIE code is a sure recipe for weird shit happening...
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-lastlog --enable-zlib --enable-openpty --enable-shadow --enable-syslog --disable-bundled-libtom --disable-harden
+fi
 make ${JOBSFLAGS} MULTI=1 PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp"
 export LDFLAGS="${BASE_LDFLAGS}"
+export CFLAGS="${BASE_CFLAGS}"
 ${CROSS_TC}-strip --strip-unneeded dropbearmulti
 cp dropbearmulti ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/dropbearmulti
 # NOTE: ... and switch back to the usual userstore for everything else ;).
@@ -1062,44 +1274,58 @@ if [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] ; then
 	echo "* Building dropbear (diags) . . ."
 	echo ""
 	cd ..
-	rm -rf dropbear-2016.74
-	tar -I lbzip2 -xvf /usr/portage/distfiles/dropbear-2016.74.tar.bz2
-	cd dropbear-2016.74
+	rm -rf dropbear-2018.76
+	tar -I lbzip2 -xvf /usr/portage/distfiles/dropbear-2018.76.tar.bz2
+	cd dropbear-2018.76
 	update_title_info
 	# Update to latest git...
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.74-upstream-catchup.patch
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-upstream-catchup.patch
+	# ...or just cherry-pick a few things. Right now, this is https://github.com/mkj/dropbear/commit/8d0b48f16550c9bf3693b2fa683f21e8276b1b1a (broken CFLAGS detection)
+	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-upstream-fixes.patch
+	# ...or apply a few things that haven't even hit upstream yet ;).
+	# This is https://github.com/mkj/dropbear/pull/61
+	# tweaked a bit to play nice with the craptastically old glibc of the K3 TC
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-pr61.patch
+	# This is https://github.com/karel-m/dropbear/commit/4530ff68975932680d674a33ea477fa7afc79ade
+	# updated for https://github.com/libtom/libtomcrypt/pull/423
+	# FIXME: Broken right now (Exit before auth: ECC error)
+	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-tomcrypt-1.19-compat.patch
 	# Gentoo patches/tweaks
 	patch -p0 < /usr/portage/net-misc/dropbear/files/dropbear-0.46-dbscp.patch
-	sed -i -e "/SFTPSERVER_PATH/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/libexec/sftp-server\":" default_options.h.in default_options.h
+	sed -i -e "/SFTPSERVER_PATH/s:\".*\":\"${DEVICE_USERSTORE}/usbnet/libexec/sftp-server\":" default_options.h
 	sed -i -e '/pam_start/s:sshd:dropbear:' svr-authpam.c
-	sed -e 's%#define DROPBEAR_X11FWD 1%#define DROPBEAR_X11FWD 0%' -i default_options.h.in default_options.h
+	sed -e 's%#define DROPBEAR_X11FWD 1%#define DROPBEAR_X11FWD 0%' -i default_options.h
 	# This only affects the bundled libtom, but disable it anyway
-	sed -e 's%#define DROPBEAR_SMALL_CODE 1%#define DROPBEAR_SMALL_CODE 0%' -i default_options.h.in default_options.h
+	sed -e 's%#define DROPBEAR_SMALL_CODE 1%#define DROPBEAR_SMALL_CODE 0%' -i default_options.h
 	# Moar crypto!
-	sed -e 's%/\*#define DROPBEAR_BLOWFISH\*/%#define DROPBEAR_BLOWFISH 1%' -i default_options.h.in default_options.h
+	sed -e 's%#define DROPBEAR_BLOWFISH 0%#define DROPBEAR_BLOWFISH 1%' -i default_options.h
+	# We want our MOTD! It has critical information on Kindles!
+	sed -e 's%#define DO_MOTD 0%#define DO_MOTD 1%' -i default_options.h
 	# More diags specific tweaks
-	sed -e '/_PATH_SSH_PROGRAM/s:".*":"/usr/local/bin/dbclient":' -i default_options.h.in default_options.h
-	sed -e '/DEFAULT_PATH/s:".*":"/usr/local/bin\:/usr/bin\:/bin":' -i default_options.h.in default_options.h
+	sed -e '/_PATH_SSH_PROGRAM/s:".*":"/usr/local/bin/dbclient":' -i default_options.h
+	sed -e '/DEFAULT_PATH/s:".*":"/usr/local/bin\:/usr/bin\:/bin":' -i default_options.h
 	# Show /etc/issue
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-show-issue.patch
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-show-issue.patch
 	# No passwd...
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-nopasswd-hack.patch
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-nopasswd-hack.patch
 	# Pubkeys in ${DEVICE_USERSTORE}/usbnet/etc/authorized_keys & with perms checks curbed a bit
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-pubkey-hack.patch
-	# Make sure the linking with 'system' libtom* is done properly (libtomcrypt depends on libtommath, so we need to end up with -ltomcrypt -ltommath, not the other way around)
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-fix-system-libtom.patch
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-pubkey-hack.patch
 	# Enable the no password mode by default
-	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2016.73-kindle-nopasswd-hack-as-default.patch
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-2018.76-kindle-nopasswd-hack-as-default.patch
 	# Fix the Makefile so that LTO flags aren't dropped in the linking stage...
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/dropbear-fix-Makefile-for-lto.patch
 	# Kill bundled libtom, we're using our own, from the latest develop branch
 	rm -rf libtomcrypt libtommath
 	autoreconf -fi
+	# Use the same CFLAGS as libtom*
+	export CFLAGS="${RICE_CFLAGS}"
 	# Build that one against a static zlib...
 	for db_dep in libz.so libz.so.${ZLIB_SOVER%%.*} libz.so.${ZLIB_SOVER} ; do mv -v ../lib/${db_dep} ../lib/_${db_dep} ; done
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-lastlog --enable-zlib --enable-openpty --enable-shadow --enable-syslog --disable-bundled-libtom
+	# NOTE: Disable hardeneing, always, we don't know how weird some diags build may be...
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-lastlog --enable-zlib --enable-openpty --enable-shadow --enable-syslog --disable-bundled-libtom --disable-harden
 	make ${JOBSFLAGS} MULTI=1 PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp"
 	for db_dep in libz.so libz.so.${ZLIB_SOVER%%.*} libz.so.${ZLIB_SOVER} ; do mv -v ../lib/_${db_dep} ../lib/${db_dep} ; done
+	export CFLAGS="${BASE_CFLAGS}"
 	${CROSS_TC}-strip --strip-unneeded dropbearmulti
 	cp dropbearmulti ${BASE_HACKDIR}/RescuePack/src/dropbearmulti
 fi
@@ -1107,8 +1333,8 @@ fi
 echo "* Building rsync . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/rsync-3.1.2.tar.gz
-cd rsync-3.1.2
+tar -I pigz -xvf /usr/portage/distfiles/rsync-3.1.3.tar.gz
+cd rsync-3.1.3
 update_title_info
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-acl-support --disable-xattr-support --disable-ipv6 --disable-debug
 make ${JOBSFLAGS}
@@ -1137,7 +1363,7 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] && [[ "${USE_TIRPC}" == "true" ]] ; then
 	cd ..
 	cd ..
 
-	# FIXME: Someone will have to explain that one to me. This is supposed to one day replace glibc's rpc support, which isn't built by default anymore... and yet it requires the glibc's rpc headers at build time. WTF?!
+	# XXX: Someone will have to explain that one to me. This is supposed to one day replace glibc's rpc support, which isn't built by default anymore... and yet it requires the glibc's rpc headers at build time. WTF?!
 	# At least I'm not alone to have noticed... but nobody seems to care. (cf. http://sourceforge.net/p/libtirpc/bugs/25/, which is roughly 4 years old).
 	# Work that shit around by siphoning the headers from our K5 TC, which is the closest match...
 	mkdir -p include/rpcsvc
@@ -1146,7 +1372,7 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] && [[ "${USE_TIRPC}" == "true" ]] ; then
 	cp -v ${HOME}/x-tools/arm-kindle5-linux-gnueabi/arm-kindle5-linux-gnueabi/sysroot/usr/include/rpcsvc/nislib.h include/rpcsvc/
 
 	echo "* Building TI-RPC . . ."
-	# FIXME: For added fun, linking this w/ LTO fucks it up silently (broken pmap_* symbols)... (Linaro GCC 4.9 2015.04-1 & Linaro binutils 2.25.0-2015.01-2)
+	# XXX: For added fun, linking this w/ LTO fucks it up silently (broken pmap_* symbols)... (Linaro GCC 4.9 2015.04-1 & Linaro binutils 2.25.0-2015.01-2)
 	if [[ "${CFLAGS}" != "${NOLTO_CFLAGS}" ]] ; then
 		temp_nolto="true"
 		export CFLAGS="${NOLTO_CFLAGS}"
@@ -1167,22 +1393,22 @@ fi
 
 echo "* Building busybox . . ."
 echo ""
-# FIXME: Currently fails to link w/ gold (internal error in do_print_to_mapfile)... (Linaro GCC 5.2 2015.09 & binutils 2.25.1)
-#if [[ "${CTNG_LD_IS}" == "gold" ]] ; then
-#	temp_nogold="true"
-#	unset CTNG_LD_IS
-#fi
 cd ..
-tar -I lbzip2 -xvf /usr/portage/distfiles/busybox-1.24.2.tar.bz2
-cd busybox-1.24.2
+tar -I lbzip2 -xvf /usr/portage/distfiles/busybox-1.29.3.tar.bz2
+cd busybox-1.29.3
 update_title_info
+# FIXME: Workarounds conflicting typedefs between <unistd.h> and <linux/types.h> because of the terribly old kernel we're using...
+if [[ "${KINDLE_TC}" == "K3" ]] ; then
+	export CPPFLAGS="${BASE_CPPFLAGS} -D__KERNEL_STRICT_NAMES"
+fi
+# NOTE: We won't be resetting CROSS_COMPILE, a few other packages down the line make use of it...
+#       It being slightly non-standard may explain why I never simply made it part of the env setup?
 export CROSS_COMPILE="${CROSS_TC}-"
 #export CFLAGS="${BASE_CFLAGS} -fno-strict-aliasing"
 #export CXXFLAGS="${BASE_CFLAGS} -fno-strict-aliasing"
-patch -p1 < /usr/portage/sys-apps/busybox/files/busybox-1.19.0-bb.patch
-patch -p1 < /usr/portage/sys-apps/busybox/files/busybox-1.24.1-trylink-ldflags.patch
-for patchfile in /usr/portage/sys-apps/busybox/files/busybox-1.24.2-*.patch ; do
-	patch -p1 < ${patchfile}
+patch -p1 < /usr/portage/sys-apps/busybox/files/busybox-1.26.2-bb.patch
+for patchfile in /usr/portage/sys-apps/busybox/files/busybox-1.29.3-*.patch ; do
+	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
 done
 cp /usr/portage/sys-apps/busybox/files/ginit.c init/
 sed -i -r -e 's:[[:space:]]?-(Werror|Os|falign-(functions|jumps|loops|labels)=1|fomit-frame-pointer)\>::g' Makefile.flags
@@ -1191,31 +1417,53 @@ sed -i '/^#error Aborting compilation./d' applets/applets.c
 sed -i 's:-Wl,--gc-sections::' Makefile
 sed -i 's:-static-libgcc::' Makefile.flags
 # Print issue & auth as root without pass over telnet...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.22.1-kindle-nopasswd-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.29.0-kindle-nopasswd-hack.patch
 # Look for ash profile & history in usbnet/etc
-sed -e "s#hp = concat_path_file(hp, \".profile\");#hp = concat_path_file(\"${DEVICE_USERSTORE}/usbnet/etc\", \".profile\");#" -i shell/ash.c
-sed -e "s#hp = concat_path_file(hp, \".ash_history\");#hp = concat_path_file(\"${DEVICE_USERSTORE}/usbnet/etc\", \".ash_history\");#" -i shell/ash.c
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.29.0-ash-home.patch
+sed -e "s#%DEVICE_USERSTORE%#${DEVICE_USERSTORE}#g" -i shell/ash.c
+# Apply the depmod patch on Kobo
+if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.28.4-kobo-depmod.patch
+fi
 
 make allnoconfig
 sleep 5
 ## Busybox config...
 cat << EOF
 
-	* General >
+	* Settings >
+	Support --long-options
 	Show applet usage messages
 	Enable locale
-	Support Unicode [w/o libc routines]
+	Support Unicode [w/o libc routines, they're FUBAR on Kobo due to lack of locales]
 	Use sendfile system call
 	devpts
 	utmp
 	wtmp
+	Include busybox applet
 	SUID (solo)
 	exec prefers applets
 
-	* Tuning >
+	* Settings -- Library Tuning >
 	MD5: 0
 	SHA3: 0
 	faster /proc
+	Command line editing
+	History saving
+	Reverse history search
+	Tab completion
+		Username completion
+	Fancy shell prompts
+	Query cursor position from terminal
+	Enable locale support
+	Support Unicode
+		Check $LC_ALL, $LC_CTYPE and $LANG environment variables
+		Allow zero-width Unicode characters on output
+		Allow wide Unicode characters on output
+		Bidirectional character-aware line input
+			In bidi input, support non-ASCII neutral chars too
+		Make it possible to enter sequences of chars which are not Unicode
+	Use sendfile system call
 	Use CLOCK_MONOTONIC
 	ioctl names
 	Command line editing [w/o vi-style; Save history on shell exit]
@@ -1235,6 +1483,7 @@ cat << EOF
 
 	* Applets > Networking >
 	ftpd
+		Enable -w (upload commands)
 	httpd
 	inetd
 	telnetd
@@ -1245,11 +1494,17 @@ cat << EOF
 	Alias sh & bash to ash
 	POSIX math
 	Hide message...
+	read -t N.NNN support
 	Use HISTFILESIZE
 
 EOF
 #make menuconfig
-cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.24.1-config .config
+# NOTE: Enable modutils on Kobo, and workaround the broken locales/multibyte handling of its hobbled libc...
+if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
+	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.29.0-kobo-depmod-config .config
+else
+	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.29.0-config .config
+fi
 make oldconfig
 sleep 5
 # NOTE: Remember, we jumped through a billion of shitty hoops to maybe use TI RPC on Kobo?
@@ -1259,6 +1514,9 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] && [[ "${USE_TIRPC}" == "true" ]] ; then
 fi
 make ${JOBSFLAGS} AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1
 if [[ "${KINDLE_TC}" == "KOBO" ]] && [[ "${USE_TIRPC}" == "true" ]] ; then
+	export CPPFLAGS="${BASE_CPPFLAGS}"
+fi
+if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	export CPPFLAGS="${BASE_CPPFLAGS}"
 fi
 cp busybox ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/busybox
@@ -1295,16 +1553,11 @@ if [[ "${KINDLE_TC}" == "K5" || "${KINDLE_TC}" == "PW2" ]] ; then
 
 EOF
 	#make menuconfig
-	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.24.1-gandalf-config .config
+	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.29.0-gandalf-config .config
 	make oldconfig
 	sleep 5
 	make ${JOBSFLAGS} AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1
 	cp busybox ${BASE_HACKDIR}/DevCerts/src/install/gandalf
-fi
-# NOTE: Re-enable gold if need be
-if [[ "${temp_nogold}" == "true" ]] ; then
-	unset temp_nogold
-	export CTNG_LD_IS="gold"
 fi
 
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
@@ -1337,7 +1590,7 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	sed -i -e "/^CFLAG/s:=.*:=${CFLAG} ${CFLAGS}:" -e "/^SHARED_LDFLAGS=/s:$: ${LDFLAGS}:" Makefile
 	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" depend
 	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" build_libs
-	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" install
+	make AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" install
 
 	# Copy it for the USBNet rpath...
 	for ssl_lib in libcrypto.so.0.9.8 libssl.so.0.9.8 ; do
@@ -1352,32 +1605,28 @@ elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KIND
 	echo "* Building OpenSSL 1 . . ."
 	echo ""
 	cd ..
-	tar -I pigz -xvf /usr/portage/distfiles/openssl-1.0.2j.tar.gz
-	cd openssl-1.0.2j
+	tar -I pigz -xvf /usr/portage/distfiles/openssl-1.0.2p.tar.gz
+	cd openssl-1.0.2p
 	update_title_info
+	tar xvJf /usr/portage/distfiles/openssl-1.0.2-patches-1.5.tar.xz
 	export CPPFLAGS="${BASE_CPPFLAGS} -DOPENSSL_NO_BUF_FREELISTS"
 	#export CFLAGS="${CPPFLAGS} ${BASE_CFLAGS} -fno-strict-aliasing"
 	export CFLAGS="${CPPFLAGS} ${BASE_CFLAGS}"
 	#export CXXFLAGS="${BASE_CFLAGS} -fno-strict-aliasing"
 	export LDFLAGS="${BASE_LDFLAGS} -Wa,--noexecstack"
 	rm -f Makefile
-	patch -p0 < /usr/portage/dev-libs/openssl/files/openssl-1.0.0a-ldflags.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.2i-parallel-build.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.2a-parallel-obj-headers.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.2a-parallel-install-dirs.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.2a-parallel-symlinking.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.2-ipv6.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.2a-x32-asm.patch
-	patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.0.1p-default-source.patch
+	for patchfile in patch/*.patch ; do
+		patch -p1 < ${patchfile}
+	done
 	# FIXME: Periodically check if the Kernel has been tweaked, and we can use the PMCCNTR in userland.
-	# FIXME: When Amazon ported FW 5.4.x to the PW1, they apparently helpfully backported this regression too, so apply that to K5 builds, too...
+	# NOTE: When Amazon ported FW 5.4.x to the PW1, they apparently helpfully backported this regression too, so apply that to K5 builds, too...
 	# NOTE: Since OpenSSL 1.0.2, there's also the crypto ARMv8 stuff, but that of course will never happen for us, so we can just ditch it.
 	# NOTE: Appears to be okay on Kobo... Or at least it doesn't spam dmesg ;).
 	if [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "K5" ]] ; then
 		patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssl-1.0.2-nerf-armv7_tick_armv8-armcaps.patch
 	fi
 	# NOTE: getauxval appeared in glibc 2.16, but we can't pick it up on Kobo, since those run eglibc 2_15... Nerf it (if we're using glibc 2.16).
-	# FIXME: Same deal for the PW2-against-glibc-2.19 ...
+	# XXX: Same deal for the PW2-against-glibc-2.19 ...
 	if [[ "${KINDLE_TC_IS_GLIBC_219}" == "true" ]] ; then
 		sed -e 's/extern unsigned long getauxval(unsigned long type) __attribute__ ((weak));/static unsigned long (*getauxval) (unsigned long) = NULL;/' -i crypto/armcap.c
 	fi
@@ -1397,14 +1646,14 @@ elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KIND
 	#unset CROSS_COMPILE
 	# We need it to be PIC, or mosh fails to link (not an issue anymore, now that we use a shared lib)
 	#./Configure linux-armv4 -DL_ENDIAN ${BASE_CFLAGS} -fno-strict-aliasing enable-camellia enable-mdc2 enable-tlsext enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
-	./Configure linux-armv4 -DL_ENDIAN ${CFLAGS} enable-camellia enable-ec enable-idea enable-mdc2 enable-rc5 enable-tlsext enable-asm enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
+	./Configure linux-armv4 -DL_ENDIAN ${CFLAGS} enable-camellia enable-ec enable-idea enable-mdc2 enable-rc5 enable-tlsext enable-asm enable-ssl3 enable-heartbeats enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
 	grep '^CFLAG=' Makefile | LC_ALL=C sed -e 's:^CFLAG=::' -e 's:-ffast-math ::g' -e 's:-fomit-frame-pointer ::g' -e 's:-O[0-9] ::g' -e 's:-march=[-a-z0-9]* ::g' -e 's:-mcpu=[-a-z0-9]* ::g' -e 's:-m[a-z0-9]* ::g' > x-compile-tmp
 	CFLAG="$(< x-compile-tmp)"
 	sed -i -e "/^CFLAG/s:=.*:=${CFLAG} ${CFLAGS}:" -e "/^SHARED_LDFLAGS=/s:$: ${LDFLAGS}:" Makefile
-	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" depend
-	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" all
-	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" rehash
-	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" install
+	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1 depend
+	make AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1 all
+	make AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1 rehash
+	make AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1 install
 	# If we want to only link statically because FW 5.1 moved to OpenSSL 1 while FW 5.0 was on OpenSSL 0.9.8...
 	#rm -fv ../lib/engines/lib*.so ../lib/libcrypto.so ../lib/libcrypto.so.1.0.0 ../lib/libssl.so ../lib/libssl.so.1.0.0
 
@@ -1422,9 +1671,10 @@ fi
 echo "* Building OpenSSH . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/openssh-7.3p1.tar.gz
-cd openssh-7.3p1
+tar -I pigz -xvf /usr/portage/distfiles/openssh-7.8p1.tar.gz
+cd openssh-7.8p1
 update_title_info
+#tar xvJf /usr/portage/distfiles/openssh-7.7p1-patches-1.2.tar.xz
 # NOTE: On the PW2 (Cortex A9), OpenSSH will throw a SIGILL at boot & connect (logged as an 'undefined instruction' in dmesg).
 # This is 'normal', a part of OpenSSL's capabilities tests, and it is handled properly.
 # (FWIW, it's the _armv7_tick check that fails, apparently because that feature isn't enabled for userland by the kernel for this specific CPU...
@@ -1442,20 +1692,23 @@ export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 export ac_cv_path_AR=${CROSS_TC}-gcc-ar
 sed -i -e '/_PATH_XAUTH/s:/usr/X11R6/bin/xauth:/usr/bin/xauth:' pathnames.h
 sed -i '/^AuthorizedKeysFile/s:^:#:' sshd_config
-patch -p1 < /usr/portage/net-misc/openssh/files/openssh-7.3_p1-GSSAPI-dns.patch
+patch -p1 < /usr/portage/net-misc/openssh/files/openssh-7.8_p1-GSSAPI-dns.patch
 patch -p1 < /usr/portage/net-misc/openssh/files/openssh-6.7_p1-openssl-ignore-status.patch
+patch -p1 < /usr/portage/net-misc/openssh/files/openssh-7.5_p1-disable-conch-interop-tests.patch
+for patchfile in patch/*.patch ; do
+	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
+done
 # Pubkeys in ${DEVICE_USERSTORE}/usbnet/etc/authorized_keys & with perms checks curbed a bit
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-7.2p1-kindle-pubkey-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-7.8p1-kindle-pubkey-hack.patch
 # Curb some more permission checks to avoid dying horribly on FW >= 5.3.9...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-7.2p1-kindle-perm-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-7.8p1-kindle-perm-hack.patch
 # Fix Makefile to actually make use of LTO ;).
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-fix-Makefile-for-lto.patch
 sed -i -e "s:-lcrypto:$(pkg-config --libs ../lib/pkgconfig/openssl.pc):" configure{,.ac}
 sed -i -e 's:^PATH=/:#PATH=/:' configure{,.ac}
 # Tweak a whole lot of paths to suit our needs...
 # NOTE: This is particularly ugly, but the code handles $HOME from the passwd db itself, so, gotta trick it... Use a decent amount of .. to handle people with custom HOMEdirs
-sed -e "s#~/\.ssh#${DEVICE_USERSTORE}/usbnet/etc/dot\.ssh#g" -i pathnames.h
-sed -e "s#\"\.ssh#\"../../../../../..${DEVICE_USERSTORE}/usbnet/etc/dot\.ssh#g" -i pathnames.h
+sed -e "s#\.ssh#../../../../../..${DEVICE_USERSTORE}/usbnet/etc/dot\.ssh#" -i pathnames.h
 # Fix userstore path on Kobos...
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	sed -e "s#/mnt/us#${DEVICE_USERSTORE}#g" -i auth.c
@@ -1504,9 +1757,30 @@ if [[ -d "${DEVICE_USERSTORE}/usbnet" ]] ; then
 	# Also, we kind of *need* root login here... ;D
 	sed -e 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' -i ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/sshd_config
 	sed -e 's/#PermitRootLogin no/PermitRootLogin yes/' -i ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/sshd_config
-	cp ${DEVICE_USERSTORE}/usbnet/etc/ssh_config  ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/ssh_config
+	cp ${DEVICE_USERSTORE}/usbnet/etc/ssh_config ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/ssh_config
 	# Do the same for the client...
 	sed -e '/# configuration file, and defaults at the end./s/$/\n\n# Kindle tweaks: enable aggressive KeepAlive\nServerAliveInterval 15\nServerAliveCountMax 3/' -i ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/ssh_config
+	# NOTE: And apply the Gentoo config tweaks, too.
+	locale_vars=( LANG LC_ALL LC_COLLATE LC_CTYPE LC_MESSAGES LC_MONETARY LC_NUMERIC LC_TIME LANGUAGE LC_ADDRESS LC_IDENTIFICATION LC_MEASUREMENT LC_NAME LC_PAPER LC_TELEPHONE )
+	# First the server config.
+	cat <<-EOF >> "${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/sshd_config"
+
+	# Allow client to pass locale environment variables. #367017
+	AcceptEnv ${locale_vars[*]}
+
+	# Allow client to pass COLORTERM to match TERM. #658540
+	AcceptEnv COLORTERM
+	EOF
+	# Then the client config.
+	cat <<-EOF >> "${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/ssh_config"
+
+	# Send locale environment variables. #367017
+	SendEnv ${locale_vars[*]}
+
+	# Send COLORTERM to match TERM. #658540
+	SendEnv COLORTERM
+	EOF
+	unset locale_vars
 else
 	cp ../libexec/sftp-server ${BASE_HACKDIR}/USBNetwork/src/usbnet/libexec/sftp-server
 	${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/libexec/sftp-server
@@ -1520,10 +1794,10 @@ export LDFLAGS="${BASE_LDFLAGS}"
 ## ncurses & htop for USBNet
 echo "* Building ncurses (narrowc) . . ."
 echo ""
-NCURSES_SOVER="6.0"
+NCURSES_SOVER="6.1"
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.0.tar.gz
-cd ncurses-6.0
+tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.1.tar.gz
+cd ncurses-6.1
 update_title_info
 export CFLAGS="${BASE_CFLAGS}"
 export CXXFLAGS="${BASE_CFLAGS}"
@@ -1533,7 +1807,8 @@ patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-rxvt-unicode-9.15.pa
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-pkg-config.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.9-gcc-5.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-ticlib.patch
-sed -i -e '/^PKG_CONFIG_LIBDIR/s:=.*:=$(libdir)/pkgconfig:' misc/Makefile.in
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-cppflags-cross.patch
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.1-st07_terminfo_typo.patch
 unset TERMINFO
 export CPPFLAGS="${BASE_CPPFLAGS} -D_GNU_SOURCE"
 # NOTE: cross-compile fun times, build tic for our host, in case we're not running the same ncurses version...
@@ -1543,10 +1818,10 @@ cd ${CBUILD}
 env CHOST=${CBUILD} CFLAGS="-O2 -pipe -march=native" CXXFLAGS="-O2 -pipe -march=native" LDFLAGS="-Wl,--as-needed -static" CPPFLAGS="-D_GNU_SOURCE" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../configure --{build,host}=${CBUILD} --without-shared --with-normal
 # NOTE: use our host's tic
 MY_BASE_PATH="${PATH}"
-export PATH="${TC_BUILD_DIR}/ncurses-6.0/${CBUILD}/progs:${PATH}"
-export TIC_PATH="${TC_BUILD_DIR}/ncurses-6.0/${CBUILD}/progs/tic"
+export PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs:${PATH}"
+export TIC_PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs/tic"
 cd ..
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant --disable-stripping
 # NOTE: Build our hosts's tic
 cd ${CBUILD}
 make -j1 sources
@@ -1561,16 +1836,16 @@ unset TIC_PATH
 export PATH="${MY_BASE_PATH}"
 unset CBUILD
 export CPPFLAGS="${BASE_CPPFLAGS}"
-# Kobo doesn't ship ncurses at all, but we always need it anyway, since 6.0 changed the sover ;)
+# Kobo doesn't ship ncurses at all, but we always need it anyway, since >= 6.0 changed the sover ;)
 cp ../lib/libncurses.so.${NCURSES_SOVER} ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libncurses.so.${NCURSES_SOVER%%.*}
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libncurses.so.${NCURSES_SOVER%%.*}
 # We then do a widechar build, which is actually mostly the one we'll be relying on
 echo "* Building ncurses (widec) . . ."
 echo ""
 cd ..
-rm -rf ncurses-6.0
-tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.0.tar.gz
-cd ncurses-6.0
+rm -rf ncurses-6.1
+tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.1.tar.gz
+cd ncurses-6.1
 update_title_info
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-gfbsd.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.7-nongnu.patch
@@ -1578,7 +1853,8 @@ patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-rxvt-unicode-9.15.pa
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-pkg-config.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.9-gcc-5.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-ticlib.patch
-sed -i -e '/^PKG_CONFIG_LIBDIR/s:=.*:=$(libdir)/pkgconfig:' misc/Makefile.in
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-cppflags-cross.patch
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.1-st07_terminfo_typo.patch
 export CPPFLAGS="${BASE_CPPFLAGS} -D_GNU_SOURCE"
 # NOTE: cross-compile fun times, build tic for our host, in case we're not running the same ncurses version...
 export CBUILD="$(uname -m)-pc-linux-gnu"
@@ -1587,10 +1863,10 @@ cd ${CBUILD}
 env CHOST=${CBUILD} CFLAGS="-O2 -pipe -march=native" CXXFLAGS="-O2 -pipe -march=native" LDFLAGS="-Wl,--as-needed -static" CPPFLAGS="-D_GNU_SOURCE" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../configure --{build,host}=${CBUILD} --without-shared --with-normal
 # NOTE: use our host's tic
 MY_BASE_PATH="${PATH}"
-export PATH="${TC_BUILD_DIR}/ncurses-6.0/${CBUILD}/progs:${PATH}"
-export TIC_PATH="${TC_BUILD_DIR}/ncurses-6.0/${CBUILD}/progs/tic"
+export PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs:${PATH}"
+export TIC_PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs/tic"
 cd ..
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --enable-widec --without-pthread --without-reentrant --includedir="${TC_BUILD_DIR}/include/ncursesw"
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --enable-widec --without-pthread --without-reentrant --includedir="${TC_BUILD_DIR}/include/ncursesw" --disable-stripping
 # NOTE: Build our hosts's tic
 cd ${CBUILD}
 make -j1 sources
@@ -1619,16 +1895,16 @@ fi
 echo "* Building htop . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/htop-2.0.2.tar.gz
-cd htop-2.0.2
+tar -I pigz -xvf /usr/portage/distfiles/htop-2.2.0.tar.gz
+cd htop-2.2.0
 update_title_info
-# FIXME: Currently fails to build w/ LTO (ICE)... (K5 TC, Linaro GCC 5.2 2015.09 & binutils 2.25.1)
+# NOTE: Used to fail to build w/ LTO (ICE)... (K5 TC, Linaro GCC 5.2 2015.09 & binutils 2.25.1)
 #if [[ "${CFLAGS}" != "${NOLTO_CFLAGS}" ]] ; then
 #	temp_nolto="true"
 #	export CFLAGS="${NOLTO_CFLAGS}"
 #fi
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-2.0.2-to-HEAD.patch
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-1.0.3-kindle-tweaks.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-2.2.0-to-HEAD.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-2.2.0-kindle-tweaks.patch
 # Kobo doesn't ship ncurses... Some Kindles don't ship ncursesw either, so always use our own.
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 # Fix userstore path on Kobos...
@@ -1640,7 +1916,15 @@ export ac_cv_func_malloc_0_nonnull=yes
 export ac_cv_func_realloc_0_nonnull=yes
 export ac_cv_file__proc_meminfo=yes
 export ac_cv_file__proc_stat=yes
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-unicode --enable-taskstats
+# NOTE: ncurses-config is the pits. Use the x-compiled one, not our system's...
+export HTOP_NCURSES_CONFIG_SCRIPT="${TC_BUILD_DIR}/bin/ncurses6-config"
+export HTOP_NCURSESW_CONFIG_SCRIPT="${TC_BUILD_DIR}/bin/ncursesw6-config"
+# NOTE: Locales are broken, gconv modules are missing, wchar_t is basically unusable. Don't try to handle widechars/multibyte on Kobo.
+if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-hwloc --enable-taskstats --disable-cgroup --disable-linux-affinity --disable-unicode
+else
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-hwloc --enable-taskstats --disable-cgroup --disable-linux-affinity --enable-unicode
+fi
 make ${JOBSFLAGS}
 make install
 ${CROSS_TC}-strip --strip-unneeded ../bin/htop
@@ -1648,6 +1932,8 @@ unset ac_cv_func_malloc_0_nonnull
 unset ac_cv_func_realloc_0_nonnull
 unset ac_cv_file__proc_meminfo
 unset ac_cv_file__proc_stat
+unset HTOP_NCURSES_CONFIG_SCRIPT
+unset HTOP_NCURSESW_CONFIG_SCRIPT
 cp ../bin/htop ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/htop
 export LDFLAGS="${BASE_LDFLAGS}"
 # NOTE: Re-enable LTO if need be
@@ -1660,13 +1946,15 @@ fi
 echo "* Building lsof . . ."
 echo ""
 cd ..
-tar -I lbzip2 -xvf /usr/portage/distfiles/lsof_4.89.tar.bz2
-cd lsof_4.89
-tar -xvf lsof_4.89_src.tar
-cd lsof_4.89_src
+tar -I lbzip2 -xvf /usr/portage/distfiles/lsof_4.91.tar.bz2
+cd lsof_4.91
+tar -xvf lsof_4.91_src.tar
+cd lsof_4.91_src
 update_title_info
 touch .neverInv
 patch -p1 < /usr/portage/sys-process/lsof/files/lsof-4.85-cross.patch
+patch -p1 < /usr/portage/sys-process/lsof/files/lsof-4.90-darwin-cppfix.patch
+export CPPFLAGS="${BASE_CPPFLAGS} -DHASNOTRPC -DHASNORPC_H"
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	LSOF_CC="${CROSS_TC}-gcc" LSOF_AR="${CROSS_TC}-gcc-ar rc" LSOF_RANLIB="${CROSS_TC}-gcc-ranlib" LSOF_NM="${CROSS_TC}-gcc-nm" LSOF_CFGF="${CFLAGS} ${CPPFLAGS}" LSOF_CFGL="${CFLAGS} ${LDFLAGS}" LSOF_ARCH="armv6l" LSOF_INCLUDE="${TC_BUILD_DIR}/include" LINUX_CLIB="-DGLIBCV=2" LINUX_HASSELINUX="N" ./Configure -n linux
 elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
@@ -1676,6 +1964,7 @@ make ${JOBSFLAGS} DEBUG="" all
 ${CROSS_TC}-strip --strip-unneeded lsof
 cp lsof ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/lsof
 cd ..
+export CPPFLAGS="${BASE_CPPFLAGS}"
 
 ## shlock for Fonts & SS
 echo "* Building shlock . . ."
@@ -1684,7 +1973,7 @@ cd ..
 mkdir shlock
 cd shlock
 update_title_info
-wget http://gitweb.dragonflybsd.org/dragonfly.git/blob_plain/HEAD:/usr.bin/shlock/shlock.c -O shlock.c
+wget https://gitweb.dragonflybsd.org/dragonfly.git/blob_plain/HEAD:/usr.bin/shlock/shlock.c -O shlock.c
 ## BSD -> LINUX
 patch -p0 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/shlock-DFBSD-to-GNU.patch
 ${CROSS_TC}-gcc shlock.c ${BASE_CFLAGS} ${BASE_LDFLAGS} -o shlock
@@ -1696,12 +1985,12 @@ cp shlock ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/shlock
 echo "* Building protobuf . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/protobuf-3.0.0_beta3_p1.tar.gz
-cd protobuf-3.0.0-beta-3.1
+tar -I pigz -xvf /usr/portage/distfiles/protobuf-3.6.1.tar.gz
+cd protobuf-3.6.1
 update_title_info
-patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-2.5.0-emacs-24.4.patch
-patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-2.6.1-protoc-cmdline.patch
-patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.0.0_beta2-disable-local-gmock.patch
+patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.6.0-disable_no-warning-test.patch
+patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.6.0-system_libraries.patch
+patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.6.0-protoc_input_output_files.patch
 export CXXFLAGS="${BASE_CFLAGS} -DGOOGLE_PROTOBUF_NO_RTTI"
 autoreconf -fi
 ## NOTE: The host *must* be running the exact same version (for protoc)
@@ -1723,15 +2012,15 @@ cd ..
 # The K5 handles: <= GLIBCXX_3.4.14 / CXXABI_1.3.4 / CXXABI_ARM_1.3.3
 # Also, setup an RPATH for OpenSSL....
 export LDFLAGS="${BASE_LDFLAGS} -static-libstdc++ -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-tar -I pigz -xvf /usr/portage/distfiles/mosh-1.2.5.tar.gz
-cd mosh-1.2.5
+tar -I pigz -xvf /usr/portage/distfiles/mosh-1.3.2.tar.gz
+cd mosh-1.3.2
 update_title_info
 patch -p1 < /usr/portage/net-misc/mosh/files/mosh-1.2.5-git-version.patch
 ./autogen.sh
 if [[ "${KINDLE_TC}" == "K3" ]] || [[ "${KINDLE_TC_IS_GLIBC_219}" == "true" ]] ; then
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-client --enable-server --disable-hardening
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-completion --enable-client --enable-server --disable-examples --disable-urw --disable-hardening --without-utempter
 elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-client --enable-server --enable-hardening
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-completion --enable-client --enable-server --disable-examples --disable-urw --enable-hardening --without-utempter
 fi
 make ${JOBSFLAGS} V=1
 make install
@@ -1745,7 +2034,7 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.3.2_p20171030.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.3.3_p20181006.tar.xz
 cd libarchive
 update_title_info
 # Kill -Werror, git master doesn't always build with it...
@@ -1767,6 +2056,7 @@ cd ..
 tar xvJf /usr/portage/distfiles/gmp-6.1.2.tar.xz
 cd gmp-6.1.2
 update_title_info
+patch -p1 < /usr/portage/dev-libs/gmp/files/gmp-6.1.0-noexecstack-detect.patch
 autoreconf -fi
 libtoolize
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
@@ -1784,10 +2074,8 @@ echo "* Building nettle . . ."
 echo ""
 cd ..
 if [[ "${USE_STABLE_NETTLE}" == "true" ]] ; then
-	tar -I pigz -xvf /usr/portage/distfiles/nettle-2.7.1.tar.gz
-	cd nettle-2.7.1
-	# Breaks the tools build if we don't build the shared libs at all, which is precisely what we do ;).
-	#patch -p1 < /usr/portage/dev-libs/nettle/files/nettle-2.7-shared.patch
+	tar -I pigz -xvf /usr/portage/distfiles/nettle-3.4.tar.gz
+	cd nettle-3.4
 	sed -e '/CFLAGS=/s: -ggdb3::' -e 's/solaris\*)/sunldsolaris*)/' -i configure.ac
 	sed -i '/SUBDIRS/s/testsuite examples//' Makefile.in
 	autoreconf -fi
@@ -1798,14 +2086,14 @@ if [[ "${USE_STABLE_NETTLE}" == "true" ]] ; then
 	elif [[ "${KINDLE_TC}" == "PW2" ]] ; then
 		env ac_cv_host="armv7l-kindlepw2-linux-gnueabi" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --enable-public-key --disable-openssl --disable-documentation --enable-arm-neon
 	elif [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-		env ac_cv_host="armv7l-kobo-linux-gnueabi" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --enable-public-key --disable-openssl --disable-documentation --enable-arm-neon
+		env ac_cv_host="armv7l-kobo-linux-gnueabihf" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --enable-public-key --disable-openssl --disable-documentation --enable-arm-neon
 	fi
 	make ${JOBSFLAGS}
 	make install
 else
 	# Build from git to benefit from the more x86_64 friendly API changes
 	rm -rf nettle-git
-	until git clone https://git.lysator.liu.se/nettle/nettle.git nettle-git ; do
+	until git clone --depth 1 https://git.lysator.liu.se/nettle/nettle.git nettle-git ; do
 		rm -rf nettle-git
 		sleep 15
 	done
@@ -1821,7 +2109,7 @@ else
 	elif [[ "${KINDLE_TC}" == "PW2" ]] ; then
 		env ac_cv_host="armv7l-kindlepw2-linux-gnueabi" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --enable-public-key --disable-openssl --disable-documentation --enable-arm-neon
 	elif [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-		env ac_cv_host="armv7l-kobo-linux-gnueabi" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --enable-public-key --disable-openssl --disable-documentation --enable-arm-neon
+		env ac_cv_host="armv7l-kobo-linux-gnueabihf" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --enable-public-key --disable-openssl --disable-documentation --enable-arm-neon
 	fi
 	make ${JOBSFLAGS}
 	make install
@@ -1832,6 +2120,7 @@ echo "* Building KindleTool . . ."
 echo ""
 cd ..
 rm -rf KindleTool
+# NOTE: Not shallow because we want a proper version tag
 until git clone https://github.com/NiLuJe/KindleTool.git ; do
 	rm -rf KindleTool
 	sleep 15
@@ -1839,7 +2128,7 @@ done
 cd KindleTool
 update_title_info
 export KT_NO_USERATHOST_TAG="true"
-export CFLAGS="${BASE_CFLAGS} -DKT_USERATHOST='\"niluje@ajulutsikael\"'"
+export CFLAGS="${BASE_CFLAGS} -DKT_USERATHOST='\"niluje@tyrande\"'"
 # Setup an RPATH for OpenSSL on the K5....
 # Keep it K5 only, because on the K3, so far we haven't had any issues with KindleTool, and we use it in the JailBreak, too, so an rpath isn't the way to go
 #if [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
@@ -1882,13 +2171,14 @@ cp kindle_usbnet_addr ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/kindle_usbnet_ad
 echo "* Building libpng . . ."
 echo ""
 cd ..
-LIBPNG_SOVER="16.34.0"
-tar xvJf /usr/portage/distfiles/libpng-1.6.34.tar.xz
-cd libpng-1.6.34
+LIBPNG_SOVER="16.35.0"
+tar xvJf /usr/portage/distfiles/libpng-1.6.35.tar.xz
+cd libpng-1.6.35
 update_title_info
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/libpng-fix-Makefile-for-lto.patch
 autoreconf -fi
+export CFLAGS="${RICE_CFLAGS}"
 # Pull our own zlib, to avoid symbol versioning issues (and enjoy better PNG compression perf)...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/linkss/lib -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 if [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
@@ -1899,6 +2189,7 @@ fi
 make ${JOBSFLAGS}
 make install
 export LDFLAGS="${BASE_LDFLAGS}"
+export CFLAGS="${BASE_CFLAGS}"
 # Install shared libs...
 cp ../lib/libpng16.so.${LIBPNG_SOVER} ${BASE_HACKDIR}/ScreenSavers/src/linkss/lib/libpng16.so.${LIBPNG_SOVER%%.*}
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/ScreenSavers/src/linkss/lib/libpng16.so.${LIBPNG_SOVER%%.*}
@@ -1910,18 +2201,21 @@ ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/lib
 echo "* Building libjpeg-turbo . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/libjpeg-turbo-1.5.1.tar.gz
-cd libjpeg-turbo-1.5.1
+tar -I pigz -xvf /usr/portage/distfiles/libjpeg-turbo-2.0.0.tar.gz
+cd libjpeg-turbo-2.0.0
 update_title_info
-patch -p1 < /usr/portage/media-libs/libjpeg-turbo/files/libjpeg-turbo-1.2.0-x32.patch
-autoreconf -fi
+export CFLAGS="${RICE_CFLAGS}"
+mkdir -p build
+cd build
 if [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --with-mem-srcdst --without-java
+	${CMAKE} .. -DENABLE_STATIC=ON -DENABLE_SHARED=OFF -DWITH_MEM_SRCDST=ON -DWITH_JAVA=OFF
 else
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --with-mem-srcdst --without-java --without-simd
+	${CMAKE} .. -DENABLE_STATIC=ON -DENABLE_SHARED=OFF -DWITH_MEM_SRCDST=ON -DWITH_JAVA=OFF -DREQUIRE_SIMD=OFF -DWITH_SIMD=OFF
 fi
-make ${JOBSFLAGS} V=1
+make ${JOBSFLAGS} VERBOSE=1
 make install
+cd ..
+export CFLAGS="${BASE_CFLAGS}"
 
 ## ImageMagick for ScreenSavers
 echo "* Building ImageMagick . . ."
@@ -1929,17 +2223,25 @@ echo ""
 cd ..
 # FWIW, you can pretty much use the same configure line for GraphicsMagick, although the ScreenSavers hack won't work with it.
 # It doesn't appear to need the quantize patch though, it consumes a 'normal' amount of memory by default.
-tar xvJf /usr/portage/distfiles/ImageMagick-6.9.6-0.tar.xz
-cd ImageMagick-6.9.6-0
+tar xvJf /usr/portage/distfiles/ImageMagick-6.9.10-12.tar.xz
+cd ImageMagick-6.9.10-12
 update_title_info
 # Use the same codepath as on iPhone devices to nerf the 65MB alloc of the dither code... (We also use a quantum-depth of 8 to keep the memory usage down)
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/ImageMagick-6.8.6-5-nerf-dither-mem-alloc.patch
+export CFLAGS="${RICE_CFLAGS}"
 # Pull our own zlib to avoid symbol versioning issues...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/linkss/lib"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --without-magick-plus-plus --disable-openmp --disable-deprecated --disable-installed --disable-hdri --disable-opencl --disable-largefile --with-threads --without-modules --with-quantum-depth=8 --without-perl --without-bzlib --without-x --with-zlib --without-autotrace --without-dps --without-djvu --without-fftw --without-fpx --without-fontconfig --with-freetype --without-gslib --without-gvc --without-jbig --with-jpeg --without-openjp2 --without-lcms --without-lcms2 --without-lqr --without-lzma --without-mupdf --without-openexr --without-pango --with-png --without-rsvg --without-tiff --without-webp --without-corefonts --without-wmf --without-xml
+# Make sure configure won't think we might want modules because it mixes the modules check with the automagic availability of OpenCL...
+export ax_cv_check_cl_libcl=no
+# NOTE: Because FT's pkg-config file is terrible w/ LTO...
+export PKG_CONFIG="pkg-config --static"
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --without-magick-plus-plus --disable-openmp --disable-deprecated --disable-installed --disable-hdri --disable-opencl --disable-largefile --with-threads --without-modules --with-quantum-depth=8 --without-perl --without-bzlib --without-x --with-zlib --without-autotrace --without-dps --without-djvu --without-fftw --without-fpx --without-fontconfig --with-freetype --without-gslib --without-gvc --without-jbig --with-jpeg --without-openjp2 --without-lcms --without-lcms --without-lqr --without-lzma --without-openexr --without-pango --with-png --without-rsvg --without-tiff --without-webp --without-wmf --without-xml
 make ${JOBSFLAGS} V=1
 make install
+unset PKG_CONFIG
+unset ax_cv_check_cl_libcl
 export LDFLAGS="${BASE_LDFLAGS}"
+export CFLAGS="${BASE_CFLAGS}"
 ${CROSS_TC}-strip --strip-unneeded ../bin/convert
 cp ../bin/convert ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/convert
 cp -f ../etc/ImageMagick-6/* ${BASE_HACKDIR}/ScreenSavers/src/linkss/etc/ImageMagick-6/
@@ -1951,16 +2253,19 @@ cd ..
 tar -I pigz -xvf /usr/portage/distfiles/bzip2-1.0.6.tar.gz
 cd bzip2-1.0.6
 update_title_info
-patch -p0 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.4-makefile-CFLAGS.patch
-patch -p0 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-saneso.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.4-makefile-CFLAGS.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-saneso.patch
 patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.4-man-links.patch
 patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-progress.patch
-patch -p0 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.3-no-test.patch
-patch -p0 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.4-POSIX-shell.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.3-no-test.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.4-POSIX-shell.patch
 patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-mingw.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-out-of-tree-build.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-CVE-2016-3189.patch
+patch -p1 < /usr/portage/app-arch/bzip2/files/bzip2-1.0.6-ubsan-error.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/bzip2-fix-Makefile-for-lto.patch
-sed -i -e 's:\$(PREFIX)/man:\$(PREFIX)/share/man:g' -e 's:ln -s -f $(PREFIX)/bin/:ln -s :' -e 's:$(PREFIX)/lib:$(PREFIX)/$(LIBDIR):g' Makefile
+sed -i -e 's:\$(PREFIX)/man:\$(PREFIX)/share/man:g' -e 's:ln -s -f $(PREFIX)/bin/:ln -s -f :' -e 's:$(PREFIX)/lib:$(PREFIX)/$(LIBDIR):g' Makefile
 make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" ${JOBSFLAGS} -f Makefile-libbz2_so all
 export CFLAGS="${BASE_CFLAGS} -static"
 make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" ${JOBSFLAGS} all
@@ -1970,11 +2275,13 @@ make PREFIX="${TC_BUILD_DIR}" LIBDIR="lib" install
 ## libffi for Python
 echo "* Building libffi . . ."
 echo ""
-FFI_SOVER="6.0.4"
+FFI_SOVER="7.1.0"
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/libffi-3.2.1.tar.gz
-cd libffi-3.2.1
+tar -I pigz -xvf /usr/portage/distfiles/libffi-3.3-rc0.tar.gz
+cd libffi-3.3-rc0
 update_title_info
+patch -p1 < /usr/portage/dev-libs/libffi/files/libffi-3.2.1-o-tmpfile-eacces.patch
+patch -p1 < /usr/portage/dev-libs/libffi/files/libffi-3.3_rc0-hppa-no-TEXTREL.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/libffi-fix-Makefile-for-lto.patch
 autoreconf -fi
@@ -1991,11 +2298,19 @@ fi
 if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	echo "* Building ICU . . ."
 	echo ""
-	ICU_SOVER="57.1"
+	# FIXME: ICU >59 is masked on Gentoo 13.0 profiles... My desktop is still on 13.0, while the build-box is properly up to date.
+	#        Manually fetch it on my desktop for the time being... ebuild /usr/portage/dev-libs/icu/icu-60.2.ebuild fetch
+	ICU_SOVER="63.1"
 	cd ..
-	tar -I pigz -xvf /usr/portage/distfiles/icu4c-57_1-src.tgz
+	tar -I pigz -xvf /usr/portage/distfiles/icu4c-63_1-src.tgz
 	cd icu/source
 	update_title_info
+	patch -p1 < /usr/portage/dev-libs/icu/files/icu-58.1-remove-bashisms.patch
+	patch -p1 < /usr/portage/dev-libs/icu/files/icu-58.2-darwin.patch
+	# FIXME: Once again a weird cmath issue, like gdb...
+	if [[ "${KINDLE_TC}" != "KOBO" ]] ; then
+		patch -p2 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/icu-62.1-kindle-round-fix.patch
+	fi
 	sed -i -e "s/#define U_DISABLE_RENAMING 0/#define U_DISABLE_RENAMING 1/" common/unicode/uconfig.h
 	sed -i -e "s:LDFLAGSICUDT=-nodefaultlibs -nostdlib:LDFLAGSICUDT=:" config/mh-linux
 	sed -i -e 's:icudefs.mk:icudefs.mk Doxyfile:' configure.ac
@@ -2003,7 +2318,7 @@ if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	# Cross-Compile fun...
 	mkdir ../../icu-host
 	cd ../../icu-host
-	env CFLAGS="" CXXFLAGS="" ASFLAGS="" LDFLAGS="" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../icu/source/configure --disable-renaming --disable-debug --disable-samples --enable-static
+	env CFLAGS="" CXXFLAGS="" ASFLAGS="" LDFLAGS="" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../icu/source/configure --disable-renaming --disable-debug --disable-samples --disable-layoutex --enable-static
 	# NOTE: Don't care about verbose output for the host build ;).
 	make ${JOBSFLAGS}
 	cd -
@@ -2011,13 +2326,13 @@ if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	export CC="${CROSS_TC}-gcc"
 	export CXX="${CROSS_TC}-g++"
 	export LD="${CROSS_TC}-ld"
-	# Use C++11
-	export CXXFLAGS="${BASE_CFLAGS} -std=gnu++11"
+	# Use C++14
+	export CXXFLAGS="${BASE_CFLAGS} -std=c++14"
 	# Setup our Python rpath, plus a static lstdc++, since we pull CXXABI_1.3.8, which is too new for even the K5...
 	export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/python/lib -static-libstdc++"
 	# Huh. Why this only shows up w/ LTO is a mystery...
 	export ac_cv_c_bigendian=no
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-static --enable-shared --disable-renaming --disable-samples --disable-debug --with-cross-build="${TC_BUILD_DIR}/icu-host"
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-static --enable-shared --disable-renaming --disable-samples --disable-layoutex --disable-debug --with-cross-build="${TC_BUILD_DIR}/icu-host"
 	make ${JOBSFLAGS} VERBOSE=1
 	make install
 	unset ac_cv_c_bigendian
@@ -2032,8 +2347,8 @@ fi
 ## Readline for SQLite & Python
 echo "* Building Readline . . ."
 echo ""
-READLINE_SOVER="6.3"
-READLINE_PATCHLVL="8"
+READLINE_SOVER="7.0"
+READLINE_PATCHLVL="3"
 cd ..
 tar -I pigz -xvf /usr/portage/distfiles/readline-${READLINE_SOVER}.tar.gz
 cd readline-${READLINE_SOVER}
@@ -2042,10 +2357,11 @@ for patch in $(seq 1 ${READLINE_PATCHLVL}) ; do
 	patch_file="readline${READLINE_SOVER//.}-$(printf "%03d" ${patch})"
 	patch -p0 < /usr/portage/distfiles/${patch_file}
 done
-patch -p0 < /usr/portage/sys-libs/readline/files/readline-5.0-no_rpath.patch
+patch -p1 < /usr/portage/sys-libs/readline/files/readline-5.0-no_rpath.patch
 patch -p1 < /usr/portage/sys-libs/readline/files/readline-6.2-rlfe-tgoto.patch
-patch -p1 < /usr/portage/sys-libs/readline/files/readline-6.3-fix-long-prompt-vi-search.patch
-patch -p2 < /usr/portage/sys-libs/readline/files/readline-6.3-read-eof.patch
+patch -p1 < /usr/portage/sys-libs/readline/files/readline-7.0-headers.patch
+patch -p1 < /usr/portage/sys-libs/readline/files/readline-7.0-missing-echo-proto.patch
+patch -p1 < /usr/portage/sys-libs/readline/files/readline-7.0-mingw.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/readline-fix-Makefile-for-lto.patch
 ncurses_libs="$(pkg-config ncurses --libs)"
@@ -2087,33 +2403,35 @@ export CPPFLAGS="${BASE_CPPFLAGS}"
 echo "* Building SQLite3 . . ."
 echo ""
 SQLITE_SOVER="0.8.6"
-SQLITE_VER="3140200"
+SQLITE_VER="3250200"
 cd ..
-#wget https://sqlite.org/2015/sqlite-autoconf-${SQLITE_VER}.tar.gz -O sqlite-autoconf-${SQLITE_VER}.tar.gz
+#wget https://sqlite.org/2018/sqlite-autoconf-${SQLITE_VER}.tar.gz -O sqlite-autoconf-${SQLITE_VER}.tar.gz
 #tar -I pigz -xvf sqlite-autoconf-${SQLITE_VER}.tar.gz
 tar -I pigz -xvf /usr/portage/distfiles/sqlite-autoconf-${SQLITE_VER}.tar.gz
 cd sqlite-autoconf-${SQLITE_VER}
 update_title_info
+# Gentoo patches
+patch -p1 < /usr/portage/dev-db/sqlite/files/sqlite-3.21.0-nonfull_archive-build.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/sqlite-fix-Makefile-for-lto.patch
+autoreconf -fi
 # Enable some extra features...
 export CPPFLAGS="${BASE_CPPFLAGS} -DNDEBUG -DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_RTREE -DSQLITE_SOUNDEX -DSQLITE_ENABLE_UNLOCK_NOTIFY"
+# And a few of the recommended build options from https://sqlite.org/compile.html (we only leave shared cache enabled, just in case...)
+# NOTE: We can't use SQLITE_OMIT_DECLTYPE with SQLITE_ENABLE_COLUMN_METADATA
+# NOTE: The Python SQLite module also prevents us from using SQLITE_OMIT_PROGRESS_CALLBACK as well as SQLITE_OMIT_DEPRECATED
+export CPPFLAGS="${CPPFLAGS} -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -DSQLITE_USE_ALLOCA"
 if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	export CPPFLAGS="${CPPFLAGS} -DSQLITE_ENABLE_ICU"
 	# Need to tweak that a bit to link properly against ICU...
-	sed -e "s/LIBS = @LIBS@/& -licui18n -licuuc/" -i Makefile.in
+	sed -e "s/LIBS = @LIBS@/& -licui18n -licuuc -licudata/" -i Makefile.in
 fi
 # Setup our Python rpath.
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
 # SQLite doesn't want to be built w/ -ffast-math...
 export CFLAGS="${BASE_CFLAGS/-ffast-math /}"
-# NOTE: We need a static lib on Kobos for KFMon :).
-if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --enable-shared --enable-threadsafe --enable-dynamic-extensions --enable-readline --enable-fts5 --enable-json1
-else
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-static --enable-shared --enable-threadsafe --enable-dynamic-extensions --enable-readline --enable-fts5 --enable-json1
-fi
-# FIXME: libtool is sometimes being stupid w/ parallel make... Since it's an agglo anyway, we're not losing much by disabling parallel make...
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-static --disable-static-shell --enable-shared --enable-threadsafe --enable-dynamic-extensions --enable-readline --enable-fts5 --enable-json1
+# NOTE: libtool is sometimes being stupid w/ parallel make... Since it's an agglo anyway, we're not losing much by disabling parallel make...
 make -j1
 make install
 export CFLAGS="${BASE_CFLAGS}"
@@ -2121,7 +2439,7 @@ export LDFLAGS="${BASE_LDFLAGS}"
 export CPPFLAGS="${BASE_CPPFLAGS}"
 
 ## Python for ScreenSavers
-PYTHON_CUR_VER="2.7.12"
+PYTHON_CUR_VER="2.7.15"
 echo "* Building Python . . ."
 echo ""
 cd ..
@@ -2131,12 +2449,12 @@ update_title_info
 rm -fr Modules/expat
 rm -fr Modules/_ctypes/libffi*
 rm -fr Modules/zlib
-tar xvJf /usr/portage/distfiles/python-gentoo-patches-${PYTHON_CUR_VER}-0.tar.xz
-# NOTE: The ebuild blacklists '*_regenerate_platform-specific_modules.patch' when cross-compiling, which is a good idea if the host's python version doesn't match...
-# I'm still using 2.7 as default, so I can get away with keeping it enabled.
+tar xvJf /usr/portage/distfiles/python-gentoo-patches-${PYTHON_CUR_VER}.tar.xz
+# NOTE: The ebuild blacklists '*_regenerate_platform-specific_modules.patch' when cross-compiling, which is a good idea in case the host's python version doesn't match...
+rm patches/0006-Regenerate-platform-specific-modules.patch
 for patchfile in patches/* ; do
 	# Try to detect if we need p0 or p1...
-	if grep 'diff --git' "${patchfile}" &>/dev/null ; then
+	if grep -q 'diff --git' "${patchfile}" ; then
 		echo "Applying ${patchfile} w/ p1 . . ."
 		patch -p1 < ${patchfile}
 	else
@@ -2144,11 +2462,13 @@ for patchfile in patches/* ; do
 		patch -p0 < ${patchfile}
 	fi
 done
-# Adapted from Gentoo's 2.7.3 cross-compile patchset. There's some fairly ugly and unportable hacks in there, because for the life of me I can't figure out how the cross-compile support merged in 2.7.4 is supposed to take care of some stuff... (namely, pgen & install)
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/python-2.7.12-cross-compile.patch
 # Gentoo Patches...
+patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.5-nonfatal-compileall.patch
 patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.9-ncurses-pkg-config.patch
 patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.10-cross-compile-warn-test.patch
+patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.10-system-libffi.patch
+# Adapted from Gentoo's 2.7.3 cross-compile patchset. There's some fairly ugly and unportable hacks in there, because for the life of me I can't figure out how the cross-compile support merged in 2.7.4 is supposed to take care of some stuff... (namely, pgen & install)
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/python-2.7.15-cross-compile.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/python-fix-Makefile-for-lto.patch
 sed -i -e "s:@@GENTOO_LIBDIR@@:lib:g" Lib/distutils/command/install.py Lib/distutils/sysconfig.py Lib/site.py Lib/sysconfig.py Lib/test/test_site.py Makefile.pre.in Modules/Setup.dist Modules/getpath.c setup.py
@@ -2156,12 +2476,12 @@ sed -i -e "s:@@GENTOO_LIBDIR@@:lib:g" Lib/distutils/command/install.py Lib/distu
 sed -e "s/\['ssl', 'crypto'\]/\['ssl', 'crypto', 'z'\]/g" -i setup.py
 if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	# Make sure SQLite picks up ICU properly...
-	sed -e 's/\["sqlite3",\]/\["sqlite3", "icui18n", "icuuc",\]/g' -i setup.py
+	sed -e 's/\["sqlite3",\]/\["sqlite3", "icui18n", "icuuc", "icudata",\]/g' -i setup.py
 fi
 # Bzip2 needs to be PIC (compile/link time match w/ LTO)
 sed -e "s/bz2_extra_link_args = ()/bz2_extra_link_args = ('-fPIC',)/" -i setup.py
 # Fix building with Python 3 as the default Python interpreter...
-sed -e 's#python$EXE#python2$EXE#' -i Lib/plat-linux2/regen
+sed -e 's#python#python2#' -i Tools/scripts/h2py.py
 autoreconf -fi
 
 # Note that curses needs ncursesw, which doesn't ship on every Kindle, so we ship our own. Same deal for readline.
@@ -2182,6 +2502,7 @@ OPT="-O1" CFLAGS="" CPPFLAGS="" LDFLAGS="" CC="" AR="" RANLIB="" NM="" ../config
 cd ..
 
 # The configure script assumes it's buggy when cross-compiling.
+export ac_cv_header_bluetooth_bluetooth_h=no
 export ac_cv_buggy_getaddrinfo=no
 export ac_cv_have_long_long_format=yes
 export ac_cv_file__dev_ptmx=yes
@@ -2189,7 +2510,7 @@ export ac_cv_file__dev_ptc=no
 # Would probably need a custom zoneinfo directory...
 #export ac_cv_working_tzset=yes
 export _PYTHON_HOST_PLATFORM="linux-arm"
-export PYTHON_FOR_BUILD="./hostpython"
+export PYTHON_FOR_BUILD="hostpython"
 export PGEN_FOR_BUILD="./Parser/hostpgen"
 export CC="${CROSS_TC}-gcc"
 export CXX="${CROSS_TC}-g++"
@@ -2197,7 +2518,7 @@ export CXX="${CROSS_TC}-g++"
 export ac_cv_path_PKG_CONFIG="pkg-config"
 # Setup an rpath since we use a shared libpython to be able to build third-party modules...
 export LDFLAGS="${BASE_LDFLAGS} -L. -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
-# FIXME: Currently fails to build w/ LTO (bad instruction: fldcw [sp,#6] & fnstcw [sp,#6])... (Linaro GCC 5.2 2015.09 & binutils 2.25.1)
+# NOTE: Used to fail to build w/ LTO (bad instruction: fldcw [sp,#6] & fnstcw [sp,#6])... (Linaro GCC 5.2 2015.09 & binutils 2.25.1)
 #        Those are x86 instructions, so, WTH?
 #if [[ "${CFLAGS}" != "${NOLTO_CFLAGS}" ]] ; then
 #	temp_nolto="true"
@@ -2205,14 +2526,15 @@ export LDFLAGS="${BASE_LDFLAGS} -L. -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
 #fi
 cd ${CHOST}
 # NOTE: Enable the shared library to be able to compile third-party C modules...
-OPT="" ../configure --prefix=${TC_BUILD_DIR}/python --build=${CBUILD} --host=${CROSS_TC} --enable-static --enable-shared --with-fpectl --disable-ipv6 --with-threads --enable-unicode=ucs4 --with-computed-gotos --with-libc="" --enable-loadable-sqlite-extensions --with-system-expat --with-system-ffi
+OPT="" ../configure --prefix=${TC_BUILD_DIR}/python --build=${CBUILD} --host=${CROSS_TC} --enable-static --enable-shared --with-fpectl --disable-ipv6 --with-threads --enable-unicode=ucs4 --with-computed-gotos --with-libc="" --enable-loadable-sqlite-extensions --with-system-expat --with-system-ffi --without-ensurepip
 # More cross-compile hackery...
-sed -i -e '1iHOSTPYTHONPATH = ./hostpythonpath' -e '/^PYTHON_FOR_BUILD/s:=.*:= ./hostpython:' -e '/^PGEN_FOR_BUILD/s:=.*:= ./Parser/hostpgen:' Makefile{.pre,}
+sed -e '1iHOSTPYTHONPATH = ./hostpythonpath' -e '/^PYTHON_FOR_BUILD/s:=.*:=./hostpython -E:' -e '/^PGEN_FOR_BUILD/s:=.*:= ./Parser/hostpgen:' -i Makefile{.pre,}
 cd ..
 
 cd ${CBUILD}
 # Disable as many modules as possible -- but we need a few to install.
 PYTHON_DISABLE_MODULES=$(sed -n "/Extension('/{s:^.*Extension('::;s:'.*::;p}" ../setup.py | egrep -v '(unicodedata|time|cStringIO|_struct|binascii)') PYTHON_DISABLE_SSL="1" SYSROOT= make ${JOBSFLAGS}
+make Parser/pgen
 ln python ../${CHOST}/hostpython
 ln Parser/pgen ../${CHOST}/Parser/hostpgen
 ln -s ../${CBUILD}/build/lib.*/ ../${CHOST}/hostpythonpath
@@ -2248,6 +2570,7 @@ unset ac_cv_file__dev_ptc
 unset ac_cv_file__dev_ptmx
 unset ac_cv_have_long_long_format
 unset ac_cv_buggy_getaddrinfo
+unset ac_cv_header_bluetooth_bluetooth_h
 #unset ac_cv_working_tzset
 unset CHOST
 unset CBUILD
@@ -2259,33 +2582,68 @@ unset PYTHON_DISABLE_MODULES
 cd ..
 ## NOTE: Usig the host's real Python install is hackish, but our hostpython might not have enough modules built to handle everything... Here's how it should have been called, though:
 # env PYTHONPATH="${TC_BUILD_DIR}/Python-${PYTHON_CUR_VER}/${CROSS_TC}/hostpythonpath" ../Python-${PYTHON_CUR_VER}/${CROSS_TC}/hostpython
+## chardet
+rm -rf chardet-3.0.4
+wget https://pypi.python.org/packages/source/c/chardet/chardet-3.0.4.tar.gz -O chardet-3.0.4.tar.gz
+tar -I pigz -xvf chardet-3.0.4.tar.gz
+cd chardet-3.0.4
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## idna
+rm -rf idna
+until git clone --depth 1 https://github.com/kjd/idna.git ; do
+	rm -rf idna
+	sleep 15
+done
+cd idna
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## urllib3
+rm -rf urllib3
+until git clone --depth 1 https://github.com/urllib3/urllib3.git ; do
+	rm -rf urllib3
+	sleep 15
+done
+cd urllib3
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## certifi
+rm -rf certifi-2018.8.24
+wget https://pypi.python.org/packages/source/c/certifi/certifi-2018.8.24.tar.gz -O certifi-2018.8.24.tar.gz
+tar -I pigz -xvf certifi-2018.8.24.tar.gz
+cd certifi-2018.8.24
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
 ## Requests
 rm -rf requests
-until git clone https://github.com/kennethreitz/requests.git ; do
+until git clone --depth 1 https://github.com/kennethreitz/requests.git ; do
 	rm -rf requests
 	sleep 15
 done
 cd requests
 update_title_info
+# Patch compatibility checks so that they stop complaining about our git packages,
+# and an actual fix to actually work w/ urllib3 master
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/requests-git-deps.patch
 python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
 cd ..
 ## Unidecode
 rm -rf unidecode
-if git clone http://www.tablix.org/~avian/git/unidecode.git ; then
-	cd unidecode
-else
-	# NOTE: If domain is down, use the latest PyPi release...
-	rm -rf Unidecode-0.04.19
-	wget https://pypi.python.org/packages/source/U/Unidecode/Unidecode-0.04.19.tar.gz
-	tar -I pigz -xvf Unidecode-0.04.19.tar.gz
-	cd Unidecode-0.04.19
-fi
+until git clone --depth 1 https://github.com/avian2/unidecode.git ; do
+	rm -rf unidecode
+	sleep 15
+done
+cd unidecode
 update_title_info
 python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
 cd ..
 ## pycparser for CFFI
 rm -rf pycparser
-until git clone https://github.com/eliben/pycparser.git ; do
+until git clone --depth 1 https://github.com/eliben/pycparser.git ; do
 	rm -rf pycparser
 	sleep 15
 done
@@ -2295,7 +2653,10 @@ python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-li
 cd ..
 ## CFFI
 rm -rf cffi
-hg clone https://bitbucket.org/cffi/cffi
+until hg clone https://bitbucket.org/cffi/cffi ; do
+	rm -rf cffi
+	sleep 15
+done
 cd cffi
 update_title_info
 # NOTE: This is hackish. If the host's Python doesn't exactly match, here be dragons.
@@ -2306,7 +2667,7 @@ env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared" PYTHONXCPREFIX="${TC
 cd ..
 ## SimpleJSON
 rm -rf simplejson
-until git clone https://github.com/simplejson/simplejson.git ; do
+until git clone --depth 1 https://github.com/simplejson/simplejson.git ; do
 	rm -rf simplejson
 	sleep 15
 done
@@ -2315,6 +2676,125 @@ update_title_info
 #env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared" CFLAGS="${BASE_CFLAGS} -I${TC_BUILD_DIR}/python/include/python2.7" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --no-compile
 env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared" PYTHONXCPREFIX="${TC_BUILD_DIR}/python" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py build -x
 env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared" PYTHONXCPREFIX="${TC_BUILD_DIR}/python" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## six
+rm -rf six
+until git clone --depth 1 https://github.com/benjaminp/six.git ; do
+	rm -rf six
+	sleep 15
+done
+cd six
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## asn1crypto
+rm -rf asn1crypto
+until git clone --depth 1 https://github.com/wbond/asn1crypto.git ; do
+	rm -rf asn1crypto
+	sleep 15
+done
+cd asn1crypto
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## enum34
+rm -rf enum34
+until hg clone https://bitbucket.org/stoneleaf/enum34 ; do
+	rm -rf enum34
+	sleep 15
+done
+cd enum34
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## ipaddress
+rm -rf ipaddress
+until git clone --depth 1 https://github.com/phihag/ipaddress.git ; do
+	rm -rf ipaddress
+	sleep 15
+done
+cd ipaddress
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+
+
+# NOTE: cryptography, at the very least; depends on OpenSSL >= 1.0.2...
+if [[ "${KINDLE_TC}" != "K3" ]] ; then
+	## cryptography
+	# NOTE: Building from git doesn't work, for some obscure reason...
+	rm -rf cryptography-2.3.1
+	wget https://pypi.python.org/packages/source/c/cryptography/cryptography-2.3.1.tar.gz -O cryptography-2.3.1.tar.gz
+	tar -I pigz -xvf cryptography-2.3.1.tar.gz
+	cd cryptography-2.3.1
+	update_title_info
+	#env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared" CFLAGS="${BASE_CFLAGS} -I${TC_BUILD_DIR}/python/include/python2.7" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --no-compile
+	# NOTE: We need to link against pthreads, and distutils is terrible.
+	env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared -pthread" CPPFLAGS="${BASE_CPPFLAGS} -pthread" PYTHONXCPREFIX="${TC_BUILD_DIR}/python" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py build -x
+	env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared -pthread" CPPFLAGS="${BASE_CPPFLAGS} -pthread" PYTHONXCPREFIX="${TC_BUILD_DIR}/python" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+	cd ..
+	## PyOpenSSL
+	rm -rf pyopenssl
+	# NOTE: Not shallow because it leads to broken versioning
+	until git clone https://github.com/pyca/pyopenssl.git ; do
+		rm -rf pyopenssl
+		sleep 15
+	done
+	cd pyopenssl
+	update_title_info
+	python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+	cd ..
+fi
+
+## toolbelt
+rm -rf toolbelt
+until git clone --depth 1 https://github.com/requests/toolbelt.git ; do
+	rm -rf toolbelt
+	sleep 15
+done
+cd toolbelt
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## betamax
+rm -rf betamax
+until git clone --depth 1 https://github.com/betamaxpy/betamax.git ; do
+	rm -rf betamax
+	sleep 15
+done
+cd betamax
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## pyjwt
+rm -rf pyjwt
+until git clone --depth 1 https://github.com/jpadilla/pyjwt.git ; do
+	rm -rf pyjwt
+	sleep 15
+done
+cd pyjwt
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## oauthlib
+rm -rf oauthlib
+until git clone --depth 1 https://github.com/oauthlib/oauthlib.git ; do
+	rm -rf oauthlib
+	sleep 15
+done
+cd oauthlib
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
+cd ..
+## requests-oauthlib
+rm -rf requests-oauthlib
+until git clone --depth 1 https://github.com/requests/requests-oauthlib.git ; do
+	rm -rf requests-oauthlib
+	sleep 15
+done
+cd requests-oauthlib
+update_title_info
+python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --install-lib=lib/python2.7/site-packages --no-compile
 cd ..
 
 cd Python-${PYTHON_CUR_VER}
@@ -2360,7 +2840,7 @@ chmod a+w ../python/lib/libpython2.7.a
 ${CROSS_TC}-strip --strip-unneeded ../python/lib/libpython2.7.a
 chmod a-w ../python/lib/libpython2.7.a
 chmod a+w ../python/lib/libpython2.7.so.1.0
-find ../python -name '*.so*' -exec ${CROSS_TC}-strip --strip-unneeded {} +
+find ../python -name '*.so*' -type f -exec ${CROSS_TC}-strip --strip-unneeded {} +
 chmod a-w ../python/lib/libpython2.7.so.1.0
 ${CROSS_TC}-strip --strip-unneeded ../python/bin/python2.7 ../python/bin/sqlite3
 # Assume we're only ever going to need the shared libpython...
@@ -2392,7 +2872,7 @@ if [[ "${#files[@]}" -gt 0 ]]; then
 fi
 
 if [[ -d "../python/lib/python2.7/site-packages" ]]; then
-	find "../python/lib/python2.7/site-packages" "(" -name "*.c" -o -name "*.h" -o -name "*.la" ")" -type f -print0 | xargs -0 rm -f
+	find "../python/lib/python2.7/site-packages" "(" -name "*.c" -o -name "*.h" -o -name "*.la" ")" -type f -delete
 fi
 unset file files
 # Fix some shebangs to use the target prefix, not the one from my host...
@@ -2409,7 +2889,7 @@ echo "* Building inotify-tools . . ."
 echo ""
 cd ..
 rm -rf inotify-tools
-until git clone https://github.com/rvoicilas/inotify-tools.git ; do
+until git clone --depth 1 https://github.com/rvoicilas/inotify-tools.git ; do
 	rm -rf inotify-tools
 	sleep 15
 done
@@ -2428,11 +2908,11 @@ cp ../bin/inotifywait ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/inotifywait
 echo "* Building libpcre . . ."
 echo ""
 cd ..
-tar -I lbzip2 -xvf /usr/portage/distfiles/pcre-8.39.tar.bz2
-cd pcre-8.39
+tar -I lbzip2 -xvf /usr/portage/distfiles/pcre-8.42.tar.bz2
+cd pcre-8.42
 update_title_info
-echo "Libs.private: @PTHREAD_CFLAGS@" >> libpcrecpp.pc.in
 sed -e "s:-lpcre ::" -i libpcrecpp.pc.in
+patch -p1 < /usr/portage/dev-libs/libpcre/files/libpcre-8.41-fix-stack-size-detection.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/pcre-fix-Makefile-for-lto.patch
 autoreconf -fi
@@ -2443,9 +2923,9 @@ export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 make ${JOBSFLAGS} V=1
 make install
 export LDFLAGS="${BASE_LDFLAGS}"
-cp ../lib/libpcre.so.1.2.7 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre.so.1
+cp ../lib/libpcre.so.1.2.10 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre.so.1
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre.so.1
-cp ../lib/libpcreposix.so.0.0.4 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcreposix.so.0
+cp ../lib/libpcreposix.so.0.0.6 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcreposix.so.0
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcreposix.so.0
 
 ## sshfs for USBNet (Build it at the end, I don't want glib to be automagically pulled by something earlier...)
@@ -2454,29 +2934,44 @@ ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/lib
 echo "* Building glib . . ."
 echo ""
 cd ..
-tar xvJf /usr/portage/distfiles/glib-2.48.0.tar.xz
-cd glib-2.48.0
+tar xvJf /usr/portage/distfiles/glib-2.56.2.tar.xz
+cd glib-2.56.2
 update_title_info
+#tar xvJf /usr/portage/distfiles/glib-2.56.2-patchset.tar.xz
+for patchfile in patches/*.patch ; do
+	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
+done
 sed -i -e 's/ tests//' {.,gio,glib}/Makefile.am
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/glib-fix-Makefile-for-lto.patch
 autoreconf -fi
 # Cf. https://developer.gnome.org/glib/stable/glib-cross-compiling.html
+export glib_cv_long_long_format=ll
 export glib_cv_stack_grows=no
-export glib_cv_uscore=yes
+export glib_cv_have_strlcpy=no	# libbsd, not libc
+# qsort_r is no longer used?
+if [[ "${KINDLE_TC}" == "K3" ]] ; then
+	# Glibc >= 2.8!
+	export glib_cv_have_qsort_r=no
+else
+	export glib_cv_have_qsort_r=yes
+fi
+export glib_cv_uscore=no
 export ac_cv_func_posix_getpwuid_r=yes
 export ac_cv_func_posix_getgrgid_r=yes
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --disable-libelf --disable-selinux --disable-compile-warnings --with-pcre=system --with-threads=posix
+export ac_cv_func_printf_unix98=yes
+export ac_cv_func_vsnprintf_c99=yes
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --disable-libelf --disable-selinux --with-python=python2.7 --disable-compile-warnings --with-pcre=system --with-threads=posix --disable-libmount
 make ${JOBSFLAGS} V=1
 make install
-unset glib_cv_stack_grows glib_cv_uscore ac_cv_func_posix_getpwuid_r c_cv_func_posix_getgrgid_r
+unset glib_cv_long_long_format glib_cv_stack_grows glib_cv_have_strlcpy glib_cv_have_qsort_r glib_cv_uscore ac_cv_func_posix_getpwuid_r c_cv_func_posix_getgrgid_r ac_cv_func_printf_unix98 ac_cv_func_vsnprintf_c99
 
 # And of course FUSE ;)
 echo "* Building fuse . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/fuse-2.9.7.tar.gz
-cd fuse-2.9.7
+tar -I pigz -xvf /usr/portage/distfiles/fuse-2.9.8.tar.gz
+cd fuse-2.9.8
 update_title_info
 patch -p1 < /usr/portage/sys-fs/fuse/files/fuse-2.9.3-kernel-types.patch
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} INIT_D_PATH=${TC_BUILD_DIR}/etc/init.d MOUNT_FUSE_PATH=${TC_BUILD_DIR}/sbin UDEV_RULES_PATH=${TC_BUILD_DIR}/etc/udev/rules.d --enable-shared=no --enable-static=yes --disable-example
@@ -2488,7 +2983,7 @@ echo "* Building sshfs . . ."
 echo ""
 cd ..
 rm -rf sshfs
-until git clone https://github.com/libfuse/sshfs.git ; do
+until git clone -b sshfs_2.x --single-branch --depth 1 https://github.com/libfuse/sshfs.git ; do
 	rm -rf sshfs
 	sleep 15
 done
@@ -2512,7 +3007,7 @@ echo "* Building gawk . . ."
 echo ""
 cd ..
 rm -rf gawk
-until git clone git://git.savannah.gnu.org/gawk.git ; do
+until git clone --depth 1 git://git.savannah.gnu.org/gawk.git ; do
 	rm -rf gawk
 	sleep 15
 done
@@ -2525,8 +3020,12 @@ patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/gawk-fix-Makefile-for-lto.patc
 sed -i -e '/^LN =/s:=.*:= $(LN_S):' -e '/install-exec-hook:/s|$|\nfoo:|' Makefile.in doc/Makefile.in
 sed -i '/^pty1:$/s|$|\n_pty1:|' test/Makefile.in
 # Awful hack to allow closing stdout, so that we don't block KUAL on cache hits...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/gawk-4.1.0-allow-closing-stdout.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/gawk-4.2.1-allow-closing-stdout.patch
 export ac_cv_libsigsegv=no
+export ac_cv_func_working_mktime=yes
+export has_f_format=yes
+export has_a_format=yes
+export CFLAGS="${RICE_CFLAGS}"
 # Setup an rpath for the extensions...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/extensions/gawk/lib/gawk"
 # FIXME: I'm guessing the old glibc somehow doesn't play nice with GCC, and stddef.h gets confused, but this is *very* weird.
@@ -2534,13 +3033,17 @@ export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/extensions/gawk/l
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	export CPPFLAGS="${BASE_CPPFLAGS} -D__need_ptrdiff_t"
 fi
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-nls --without-readline
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --without-mpfr --disable-nls --without-readline
 # Don't call the just-built binary...
 sed -e 's#../gawk$(EXEEXT)#gawk#' -i extension/Makefile
 make ${JOBSFLAGS}
 make install
 unset ac_cv_libsigsegv
+unset ac_cv_func_working_mktime
+unset has_f_format
+unset has_a_format
 export LDFLAGS="${BASE_LDFLAGS}"
+export CFLAGS="${BASE_CFLAGS}"
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	export CPPFLAGS="${BASE_CPPFLAGS}"
 fi
@@ -2562,15 +3065,17 @@ cd ..
 cp -av ${SVN_ROOT}/Configs/trunk/Kindle/Misc/FBGrab FBGrab
 cd FBGrab
 update_title_info
+export CFLAGS="${RICE_CFLAGS}"
 # Pull our own zlib to avoid symbol versioning issues (and enjoy better PNG compression perf)...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 make ${JOBSFLAGS} CC=${CROSS_TC}-gcc
 ${CROSS_TC}-strip --strip-unneeded fbgrab
 cp fbgrab ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbgrab
 export LDFLAGS="${BASE_LDFLAGS}"
+export CFLAGS="${BASE_CFLAGS}"
 
 # strace & ltrace
-# FIXME: Craps out w/ Linaro GCC 5.3 2016.01/2016.02/2016.03 on Thumb2 TCs (i.e., everything except K3)
+# XXX: Craps out w/ Linaro GCC 5.3 2016.01/2016.02/2016.03 on Thumb2 TCs (i.e., everything except K3)
 #	(selected processor does not support ARM mode cbnz) w/ Linaro GCC 5.3 2016.03 & binutils 2.26
 # NOTE: Has been fixed by FSF right after the 2016.03 release. Meaning it works w/ >= 2016.04 :)
 if is_ver_gte "$(${CROSS_TC}-gcc -dumpversion)" "5.3" && [[ "$(${CROSS_TC}-gcc -v 2>&1 | tail -n 1 | sed -re "s/^(gcc version)([[:blank:]])([[:digit:]\.]*)([[:blank:]])([[:digit:]]*)(.*?)$/\5/")" -lt "20160412" ]] ; then
@@ -2584,7 +3089,7 @@ else
 	cd ..
 	rm -rf libunwind
 	# Go with git because the latest release is ancient
-	until git clone git://git.savannah.gnu.org/libunwind.git libunwind ; do
+	until git clone --depth 1 git://git.savannah.gnu.org/libunwind.git libunwind ; do
 		rm -rf libunwind
 		sleep 15
 	done
@@ -2612,7 +3117,8 @@ echo "* Building strace . . ."
 echo ""
 cd ..
 rm -rf strace
-until git clone git://git.code.sf.net/p/strace/code strace ; do
+# NOTE: Not shallow because we need a checkout for the K3 build, and we want a proper version tag
+until git clone https://github.com/strace/strace.git strace ; do
 	rm -rf strace
 	sleep 15
 done
@@ -2620,20 +3126,25 @@ cd strace
 update_title_info
 # Regen the ioctl list...
 if [[ "${KINDLE_TC}" == "PW2" ]] ; then
-	# NOTE: As usual, the kernel tarball is mangled/incomplete...  Import <linux/lab126_touch.h> from the 5.6.1.0.6 package (5.6.2.1 appears to be sane too, FWIW)...
-	# cp -av {5.6.1.0.6,5.6.5}/gplrelease/linux/include/linux/lab126_touch.h
-	ksrc="${HOME}/Kindle/SourceCode_Packages/5.6.5/gplrelease/linux"
+	# NOTE: Thankfully, this one appears sane, and include/linux/linux/mxcfb.h still matches the one from 5.6.5 ;).
+	#       Make sure you're using the PW2 build: https://s3.amazonaws.com/kindledownloads/Kindle_src_5.9.5.1_3301940011.tar.gz
+	ksrc="${HOME}/Kindle/SourceCode_Packages/5.9.5.1/gplrelease/linux"
+	#ksrc="${HOME}/Kindle/SourceCode_Packages/KOA2_5.9.6.1/gplrelease/linux"
 	asrc="${ksrc}/arch/arm/include"
 elif [[ "${KINDLE_TC}" == "K5" ]] ; then
 	# NOTE: Don't move to 5.6.1.1, it ships includes for the updated eink driver, but that doesn't match the actual binaries on prod in 5.6.1.1 on the PW1...
 	# We'd need a custom mxcfb.h header like on KOReader to handle this properly if the PW1 ever actually inherits the updated driver...
+	# NOTE: For ref: https://kindle.s3.amazonaws.com/Kindle_src_5.4.4.2_2323310003.tar.gz
 	ksrc="${HOME}/Kindle/SourceCode_Packages/5.4.4.2/gplrelease/linux"
 	asrc="${ksrc}/arch/arm/include"
 elif [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-	ksrc="${HOME}/Kindle/SourceCode_Packages/Kobo-H2O/linux-2.6.35.3"
+	# NOTE: Use the H2O² (Rev 2) kernel, it has the most up to date mxcfb.h header. Might need some minor hand-holding for backward compat stuff...
+	#       c.f., https://github.com/koreader/koreader-base/issues/390
+	ksrc="${HOME}/Kindle/SourceCode_Packages/Kobo-H2O2R2"
 	asrc="${ksrc}/arch/arm/include"
 else
-	ksrc="${HOME}/Kindle/SourceCode_Packages/3.4.2/gplrelease/linux/linux-2.6.26"
+	# NOTE: https://kindle.s3.amazonaws.com/Kindle_src_3.4.2_2687240004.tar.gz
+	ksrc="${HOME}/Kindle/SourceCode_Packages/3.4.2/gplrelease/linux-2.6.26"
 	asrc="${ksrc}/include/asm-arm"
 fi
 # NOTE: Fix the permissions after unpacking, they're sometimes wonky...
@@ -2652,6 +3163,10 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	gcc -Wall -I. ioctlsort.c -o ioctlsort
 	./ioctlsort > ioctlent.h
 	mv -fv ioctlent.h linux/ioctlent.h.in
+
+	# Because I'm a little bit crazy, and I needed to make sure of something for FBInk... (Only decodes the bare minimum)
+	cp -v ${ksrc}/include/linux/einkfb.h linux/einkfb.h
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-einkfb-ioctls-k3.patch
 else
 	# NOTE: Comment out some stuff not found in our ancient kernels to avoid build failures...
 	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-ancient-kernel-compat.patch
@@ -2666,9 +3181,12 @@ else
 	# /tmp is noeexec....
 	mkdir -p tmp
 	export TMPDIR="${PWD}/tmp"
-	# Some more ugly workarounds for the positively wierd & ancient kernels used....
+	# Some more ugly workarounds for the positively weird & ancient kernels used....
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-ioctls_sym-tweaks.patch
+	#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-ioctls_sym-tweaks-koa2.patch
 	sh ./maint/ioctls_gen.sh ${ksrc}/include ${asrc}
+	cpp -P ioctl_iocdef.c -o ioctl_iocdef.i
+	sed -n 's/^DEFINE HOST/#define /p' ioctl_iocdef.i > ioctl_iocdef.h
 	gcc -Wall -I. ioctlsort.c -o ioctlsort
 	./ioctlsort > ioctlent0.h
 	export LDFLAGS="${BASE_LDFLAGS}"
@@ -2677,6 +3195,11 @@ else
 	# Copy mxcfb from the Amazon/Kobo sources, since we're building against a vanilla Kernel, and we'll need this include for the ioctl decoding patch...
 	if [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 		cp -v ${ksrc}/include/linux/mxcfb.h linux/mxcfb.h
+		if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
+			mkdir -p uapi/linux
+			cp -v ${ksrc}/include/uapi/linux/mxcfb.h uapi/linux/mxcfb.h
+			#cp -v ${ksrc}/include/linux/fb.h linux/fb.h
+		fi
 	fi
 	unset ksrc asrc
 	# Apply the ioctl decode patch for our TC. Based on https://gist.github.com/erosennin/593de363a4361411cd4f (erosennin's patch for https://github.com/koreader/koreader/issues/741) ;).
@@ -2684,6 +3207,7 @@ else
 		patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-mxcfb-ioctls-k5.patch
 	elif [[ "${KINDLE_TC}" == "PW2" ]] ; then
 		patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-mxcfb-ioctls-pw2.patch
+		#patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-mxcfb-ioctls-koa2.patch
 	elif [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 		patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-mxcfb-ioctls-kobo.patch
 	fi
@@ -2698,11 +3222,11 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	sed -re 's/(#include <linux\/types.h>)/\1\n\n#define __aligned_u64 __u64 __attribute__\(\(aligned\(8\)\)\)/' -i linux/fanotify.h
 fi
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-# NOTE: Don't try to build with libunwind support when we didn't build it... (cf. previous FIXME about libunwind on GCC 5.3 < 2016.04)
+# NOTE: Don't try to build with libunwind support when we didn't build it... (cf. previous XXX about libunwind on GCC 5.3 < 2016.04)
 if [[ -f "../lib/libunwind-ptrace.so.0.0.0" ]] ; then
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-libunwind
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-stacktrace=yes --with-libunwind --disable-gcc-Werror
 else
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --without-libunwind
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-stacktrace=no --without-libunwind --disable-gcc-Werror
 fi
 make ${JOBSFLAGS}
 make install
@@ -2711,21 +3235,25 @@ ${CROSS_TC}-strip --strip-unneeded ../bin/strace
 cp ../bin/strace ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/strace
 
 # ltrace depends on elfutils
-# FIXME: readelf relies on qsort_r, which was introduced in glibc 2.8... That obviously doesn't fly for the K3...
+# NOTE: readelf relies on qsort_r, which was introduced in glibc 2.8... That obviously doesn't fly for the K3...
 echo "* Building elfutils . . ."
 echo ""
 cd ..
-ELFUTILS_VERSION="0.166"
+ELFUTILS_VERSION="0.173"
 tar -I lbzip2 -xvf /usr/portage/distfiles/elfutils-${ELFUTILS_VERSION}.tar.bz2
 cd elfutils-${ELFUTILS_VERSION}
+update_title_info
 #sed -i -e '/^lib_LIBRARIES/s:=.*:=:' -e '/^%.os/s:%.o$::' lib{asm,dw,elf}/Makefile.in
-sed -i 's:-Werror::' */Makefile.in
+sed -i 's:-Werror::' */Makefile.in config/eu.am
 # Avoid PIC/TEXTREL issue w/ LTO... (NOTE: Not enough, symbol versioning issues or even weirder crap)
 #for my_dir in libasm backends libelf libdw src ; do
 #	sed -e 's/$(LINK) -shared/$(LINK) -fPIC -shared/' -i ${my_dir}/Makefile.in
 #	sed -e 's/$(LINK) -shared/$(LINK) -fPIC -shared/' -i ${my_dir}/Makefile.am
 #done
 # FIXME: So, do without LTO... (Linaro GCC 5.2 2015.11-2 & binutils 2.26)
+# NOTE: Currently (Linaro GCC 7.2 2017.11, binutil 2.30, elfutiils 0.170), there's also a symbol versionning/binutils related issue.
+#       We don't care about ABI compatibility, so we could disable symbol versioning for now... Which indeed helps on that front.
+#       But since there's still other weird LTO issues left, so just continue ditching LTO.
 if [[ "${CFLAGS}" != "${NOLTO_CFLAGS}" ]] ; then
 	temp_nolto="true"
 	export CFLAGS="${NOLTO_CFLAGS}"
@@ -2734,8 +3262,8 @@ autoreconf -fi
 # Pull our own zlib to avoid symbol versioning issues......
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 env LIBS="-lz" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-thread-safety --program-prefix="eu-" --with-zlib --without-bzlib --without-lzma
-make ${JOBSFLAGS}
-make install
+make ${JOBSFLAGS} V=1
+make install V=1
 export LDFLAGS="${BASE_LDFLAGS}"
 # NOTE: Restore LTO flags if needed
 if [[ "${temp_nolto}" == "true" ]] ; then
@@ -2766,45 +3294,51 @@ for my_cpu in arm aarch64 ; do
 done
 
 # ltrace apprently needs a semi-recent ptrace implementation. Kernel appears to be too old for that on legacy devices.
+# XXX: Debian discontinued Alioth. Migration to Salsa is NOT automatic. So, basically, I have no idea if/when this repo will ever show up again. Yay?
+#      In the meantime, Debian provided archives of old repos on https://alioth-archive.debian.org, so I rolled a tarball from that + the latest Debian patchset.
 if [[ "${KINDLE_TC}" != "K3" ]] ; then
 	echo "* Building ltrace . . ."
 	echo ""
 	cd ..
 	rm -rf ltrace
-	until git clone git://anonscm.debian.org/collab-maint/ltrace.git ; do
-		rm -rf ltrace
-		sleep 15
-	done
+	# NOTE: Use Debian's HTTPS transport because it's less flakey that their git one. It doesn't support shallow clones, though.
+	#       https://anonscm.debian.org/git/collab-maint/ltrace.git ?
+	#until git clone https://alioth.debian.org/anonscm/git/collab-maint/ltrace.git ; do
+	#	rm -rf ltrace
+	#	sleep 15
+	#done
+	wget http://files.ak-team.com/niluje/gentoo/ltrace-0.7.3.6_p20150612.tar.xz -O ltrace-0.7.3.6_p20150612.tar.xz
+	tar xvJf ltrace-0.7.3.6_p20150612.tar.xz
 	cd ltrace
 	update_title_info
 	./autogen.sh
 	# Regen the syscall list...
 	cd sysdeps/linux-gnu
 	if [[ "${KINDLE_TC}" == "PW2" ]] ; then
-		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/5.6.5/gplrelease/linux/arch/arm/include/asm/unistd.h > arm/syscallent.h
-		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/5.6.5/gplrelease/linux/arch/arm/include/asm/signal.h > arm/signalent.h
+		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/5.9.5.1/gplrelease/linux/arch/arm/include/asm/unistd.h > arm/syscallent.h
+		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/5.9.5.1/gplrelease/linux/arch/arm/include/asm/signal.h > arm/signalent.h
 	elif [[ "${KINDLE_TC}" == "K5" ]] ; then
 		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/5.4.4.2/gplrelease/linux/arch/arm/include/asm/unistd.h > arm/syscallent.h
 		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/5.4.4.2/gplrelease/linux/arch/arm/include/asm/signal.h > arm/signalent.h
 	elif [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/Kobo-H2O/linux-2.6.35.3/arch/arm/include/asm/unistd.h > arm/syscallent.h
-		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/Kobo-H2O/linux-2.6.35.3/arch/arm/include/asm/signal.h > arm/signalent.h
+		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/Kobo-H2O2R2/arch/arm/include/asm/unistd.h > arm/syscallent.h
+		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/Kobo-H2O2R2/arch/arm/include/asm/signal.h > arm/signalent.h
 	else
-		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/3.4.2/gplrelease/linux/linux-2.6.26/include/asm-arm/unistd.h > arm/syscallent.h
-		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/3.4.2/gplrelease/linux/linux-2.6.26/include/asm-arm/signal.h > arm/signalent.h
+		./mksyscallent < ${HOME}/Kindle/SourceCode_Packages/3.4.2/gplrelease/linux-2.6.26/include/asm-arm/unistd.h > arm/syscallent.h
+		./mksignalent < ${HOME}/Kindle/SourceCode_Packages/3.4.2/gplrelease/linux-2.6.26/include/asm-arm/signal.h > arm/signalent.h
 	fi
 	cd ../..
 
 	# Setup our rpath...
 	export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-	env LIBS="-lz" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --sysconfdir=${DEVICE_USERSTORE}/usbnet/etc --datarootdir=${DEVICE_USERSTORE}/usbnet/etc --disable-werror --disable-debug --without-libunwind --with-elfutils
+	env LIBS="-ldw -lelf -lz" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --sysconfdir=${DEVICE_USERSTORE}/usbnet/etc --datarootdir=${DEVICE_USERSTORE}/usbnet/etc --disable-werror --disable-debug --without-libunwind --with-elfutils
 	make ${JOBSFLAGS}
 	make install
 	export LDFLAGS="${BASE_LDFLAGS}"
 	${CROSS_TC}-strip --strip-unneeded ../bin/ltrace
 	cp ../bin/ltrace ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/ltrace
 	# Don't forget the config files...
-	for my_file in libc.so.conf libm.so.conf libacl.so.conf syscalls.conf ; do
+	for my_file in libc.so.conf libm.so.conf libacl.so.conf syscalls.conf libpthread.so.conf libpthread.so-types.conf libc.so-types.conf ; do
 		cp ${DEVICE_USERSTORE}/usbnet/etc/ltrace/${my_file} ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/ltrace/${my_file}
 	done
 fi
@@ -2830,8 +3364,8 @@ fi
 echo "* Building file . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/file-5.28.tar.gz
-cd file-5.28
+tar -I pigz -xvf /usr/portage/distfiles/file-5.34.tar.gz
+cd file-5.34
 update_title_info
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/file-fix-Makefile-for-lto.patch
@@ -2843,7 +3377,8 @@ export ac_cv_header_zlib_h=yes
 export ac_cv_lib_z_gzopen=yes
 # Make sure libtool doesn't eat any our of our CFLAGS when linking...
 export AM_LDFLAGS="${XC_LINKTOOL_CFLAGS}"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-fsect-man5 --datarootdir="${DEVICE_USERSTORE}/usbnet/share"
+# NOTE: We can't do much regarding Kobo's broken widechar support. Building with --disable-utf8 is not a viable solution.
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-libseccomp --enable-fsect-man5 --with-zlib --datarootdir="${DEVICE_USERSTORE}/usbnet/share"
 make ${JOBSFLAGS} V=1
 make install
 unset AM_LDFLAGS
@@ -2860,22 +3395,20 @@ cp -f ${DEVICE_USERSTORE}/usbnet/share/misc/magic.mgc ${BASE_HACKDIR}/USBNetwork
 echo "* Building nano . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/nano-2.7.1.tar.gz
-cd nano-2.7.1
+tar -I pigz -xvf /usr/portage/distfiles/nano-3.1.tar.gz
+cd nano-3.1
 update_title_info
 # NOTE: On Kindles, we hit a number of dumb collation issues with regexes needed for syntax highlighting on some locales (notably en_GB...) on some FW versions, so enforce en_US...
-patch -p0 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/nano-kindle-locale-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/nano-kindle-locale-hack.patch
 # Look for nanorc in usbnet/etc...
 sed -e "s#SYSCONFDIR \"/nanorc\"#\"${DEVICE_USERSTORE}/usbnet/etc/nanorc\"#" -i src/rcfile.c
-# Same thing for the various state files...
-sed -e "s#construct_filename(\"/.nano#strdup(\"${DEVICE_USERSTORE}/usbnet/etc/nano#g" -i src/files.c
-# Store configs in usbnet/etc
+# Store configs & state files in usbnet/etc
 sed -e "s#getenv(\"HOME\")#\"${DEVICE_USERSTORE}/usbnet/etc\"#" -i src/utils.c
 # Setup our rpath...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 export ac_cv_header_magic_h=yes
 export ac_cv_lib_magic_magic_open=yes
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-wordbounds --enable-color --enable-multibuffer --enable-nanorc --disable-wrapping-as-root --enable-speller --disable-justify --disable-debug --enable-nls --enable-utf8 --disable-tiny
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-wordbounds --enable-color --enable-multibuffer --enable-nanorc --disable-wrapping-as-root --enable-libmagic --enable-speller --disable-justify --disable-debug --enable-nls --enable-utf8 --disable-tiny --without-slang
 # Fixup some undetectable stuff when cross-compiling...
 sed -e 's|/\* #undef REDEFINING_MACROS_OK \*/|#define REDEFINING_MACROS_OK 1|' -i config.h
 make ${JOBSFLAGS}
@@ -2886,8 +3419,8 @@ export LDFLAGS="${BASE_LDFLAGS}"
 cp ../bin/nano ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/nano
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/nano
 # Handle the config...
-cp doc/nanorc.sample ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/nanorc
-for my_opt in constantshow historylog matchbrackets nowrap positionlog smarthome smooth wordbounds ; do
+cp doc/sample.nanorc ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/nanorc
+for my_opt in constantshow historylog linenumbers matchbrackets nowrap positionlog smarthome smooth wordbounds ; do
 	sed -e "s/^# set ${my_opt}/set ${my_opt}/" -i ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/nanorc
 done
 sed -e "s%^# include \"${TC_BUILD_DIR}/share/nano/\*\.nanorc\"%include \"${DEVICE_USERSTORE}/usbnet/etc/nano/\*\.nanorc\"%" -i ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/nanorc
@@ -2897,7 +3430,7 @@ cp -f ../share/nano/*.nanorc ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/nano/
 ## ZSH itself
 echo "* Building ZSH . . ."
 echo ""
-ZSH_VER="5.2"
+ZSH_VER="5.6.2"
 cd ..
 tar -xvJf /usr/portage/distfiles/zsh-${ZSH_VER}.tar.xz
 cd zsh-${ZSH_VER}
@@ -2925,6 +3458,7 @@ export zsh_cv_sys_dynamic_strip_exe=yes
 export zsh_cv_sys_dynamic_strip_lib=yes
 # Fix modules path so they won't fail at runtime...
 sed -e "s%#define MODULE_DIR \"'\$(MODDIR)'\"%#define MODULE_DIR \"${DEVICE_USERSTORE}/usbnet/lib\"%" -i Src/zsh.mdd
+# NOTE: Much like nano, I don't think there's anything sane we can do to workaround Kobo's broken widechar support... (I haven't tried building with --disable-multibyte, but I'd wager it's as unusable as nano with --disable-utf8)
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-etcdir="${DEVICE_USERSTORE}/usbnet/etc/zsh" --enable-runhelpdir="${DEVICE_USERSTORE}/usbnet/share/zsh/help" --enable-fndir="${DEVICE_USERSTORE}/usbnet/share/zsh/functions" --enable-site-fndir="${DEVICE_USERSTORE}/usbnet/share/zsh/site-functions" --enable-scriptdir="${DEVICE_USERSTORE}/usbnet/share/zsh/scripts" --enable-site-scriptdir="${DEVICE_USERSTORE}/usbnet/share/zsh/site-scripts" --enable-function-subdirs --with-tcsetpgrp --disable-maildir-support --enable-pcre --disable-cap --enable-multibyte --disable-gdbm
 make ${JOBSFLAGS}
 make install
@@ -2942,12 +3476,12 @@ cp ../bin/zsh ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/zsh
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/zsh
 mkdir -p ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/zsh
 cp -a ../lib/zsh/${ZSH_VER}/zsh/. ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/zsh
-find ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/zsh -name '*.so*' -exec ${CROSS_TC}-strip --strip-unneeded {} +
+find ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/zsh -name '*.so*' -type f -exec ${CROSS_TC}-strip --strip-unneeded {} +
 # Now for the functions & co...
 mkdir -p ${BASE_HACKDIR}/USBNetwork/src/usbnet/share/zsh
-cp -aL /mnt/us/usbnet/share/zsh/. ${BASE_HACKDIR}/USBNetwork/src/usbnet/share/zsh
+cp -aL ${DEVICE_USERSTORE}/usbnet/share/zsh/. ${BASE_HACKDIR}/USBNetwork/src/usbnet/share/zsh
 # Now, get the latest dircolors-solarized db, because the default one is eye-poppingly awful
-until git clone https://github.com/seebi/dircolors-solarized.git ; do
+until git clone --depth 1 https://github.com/seebi/dircolors-solarized.git ; do
 	rm -rf dircolors-solarized
 	sleep 15
 done
@@ -2961,12 +3495,14 @@ cp ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zshenv ${BASE_HACKDIR}/USBNetwork/src/u
 echo "* Building XZ-Utils . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/xz-5.2.2.tar.gz
-cd xz-5.2.2
+tar -I pigz -xvf /usr/portage/distfiles/xz-5.2.4.tar.gz
+cd xz-5.2.4
 update_title_info
+export CFLAGS="${RICE_CFLAGS}"
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-nls --disable-threads --enable-static --disable-shared --disable-{lzmadec,lzmainfo,lzma-links,scripts}
 make ${JOBSFLAGS}
 make install
+export CFLAGS="${BASE_CFLAGS}"
 # And send that to our common pool of binaries...
 cp ../bin/xzdec ${BASE_HACKDIR}/Common/bin/xzdec
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Common/bin/xzdec
@@ -2976,7 +3512,7 @@ echo "* Building the silver searcher . . ."
 echo ""
 cd ..
 rm -rf the_silver_searcher
-until git clone https://github.com/ggreer/the_silver_searcher.git the_silver_searcher ; do
+until git clone --depth 1 https://github.com/ggreer/the_silver_searcher.git the_silver_searcher ; do
 	rm -rf the_silver_searcher
 	sleep 15
 done
@@ -2994,17 +3530,16 @@ cp ../bin/ag ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/ag
 echo "* Building libevent . . ."
 echo ""
 cd ..
-LIBEVENT_SOVER="5.0.0"
+LIBEVENT_SOVER="6.0.2"
 LIBEVENT_LIBSUF="-2.1"
-tar -I pigz -xvf /usr/portage/distfiles/libevent-2.1.5-beta.tar.gz
-cd libevent-2.1.5-beta
+tar -I pigz -xvf /usr/portage/distfiles/libevent-2.1.8.tar.gz
+cd libevent-2.1.8-stable
 update_title_info
-patch -p1 < /usr/portage/dev-libs/libevent/files/libevent-2.1.5-event_signals_ordering.patch
 autoreconf -fi
 libtoolize
 # Setup our rpath...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-samples --disable-debug-mode --disable-malloc-replacement --disable-libevent-regress --enable-openssl --enable-thread-support
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-samples --disable-debug-mode --disable-malloc-replacement --disable-libevent-regress --enable-openssl --disable-static --enable-thread-support
 make ${JOBSFLAGS}
 make install
 export LDFLAGS="${BASE_LDFLAGS}"
@@ -3017,19 +3552,20 @@ done
 echo "* Building tmux . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/tmux-2.3.tar.gz
-cd tmux-2.3
+tar -I pigz -xvf /usr/portage/distfiles/tmux-2.8.tar.gz
+cd tmux-2.8
 update_title_info
-patch -p1 < /usr/portage/app-misc/tmux/files/tmux-2.3-flags.patch
-# Actually honor our custom config path...
-sed -e 's%#define TMUX_CONF "/etc/tmux.conf"%#ifndef TMUX_CONF\n#define TMUX_CONF "/etc/tmux.conf"\n#endif%' -i tmux.h
+patch -p1 < /usr/portage/app-misc/tmux/files/tmux-2.4-flags.patch
+# As usual, locales are being a bitch... Try to enforce a sane UTF-8 locale, and relax checks to not abort on failure...
+# NOTE: This is mainly an issue on Kobo, where both locales and widechar handling is just plain broken.
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/tmux-2.8-kobo-locale-hack.patch
 rm aclocal.m4
 autoreconf -fi
 # Needed to find the ncurses (narrowc) headers
 export CPPFLAGS="${BASE_CPPFLAGS} -I${TC_BUILD_DIR}/include/ncurses"
 # Setup our rpath...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --sysconfdir=${DEVICE_USERSTORE}/usbnet/etc
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --sysconfdir=${DEVICE_USERSTORE}/usbnet/etc --disable-debug --disable-utempter
 make ${JOBSFLAGS}
 make install
 export LDFLAGS="${BASE_LDFLAGS}"
@@ -3043,9 +3579,19 @@ cp ${SVN_ROOT}/Configs/trunk/Kindle/Misc/tmux.conf ${BASE_HACKDIR}/USBNetwork/sr
 echo "* Building GDB . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/gdb-7.11.1.tar.xz
-cd gdb-7.11.1
+tar -xvJf /usr/portage/distfiles/gdb-8.2.tar.xz
+cd gdb-8.2
 update_title_info
+tar xvJf /usr/portage/distfiles/gdb-8.1-patches-1.tar.xz
+rm patch/01_all_ia64-TRAP_HWBKPT.patch
+rm patch/02_all_solaris-no-uuidsys.patch
+for patchfile in patch/*.patch ; do
+	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
+done
+# NOTE: Workaround weird-ass error: 'log2' is not a member of 'std' when using the K3/K5/PW2 TC...
+if [[ "${KINDLE_TC}" == "K3" ]] || [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] ; then
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/gdb-8.2-k3-log2-fix.patch
+fi
 # Setup our rpath...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-werror --disable-{binutils,etc,gas,gold,gprof,ld} --enable-gdbserver --enable-64-bit-bfd --disable-install-libbfd --disable-install-libiberty --without-guile --disable-readline --with-system-readline --without-zlib --with-system-zlib --with-expat --without-lzma --enable-nls --without-python
@@ -3063,13 +3609,15 @@ echo "* Building Binutils . . ."
 echo ""
 cd ..
 rm -rf binutils
-until git clone -b binutils-2_26-branch git://sourceware.org/git/binutils-gdb.git binutils ; do
+# NOTE: Use a GH mirror, because there's over 300MB of sources, and the sourceware master isn't always in tip top shape...
+#until git clone -b binutils-2_31-branch --single-branch --depth 1 git://sourceware.org/git/binutils-gdb.git binutils ; do
+until git clone -b binutils-2_31-branch --single-branch --depth 1 https://github.com/bminor/binutils-gdb.git binutils ; do
 	rm -rf binutils
 	sleep 15
 done
 cd binutils
 update_title_info
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-nls --with-zlib --enable-secureplt --enable-threads --enable-install-libiberty --disable-werror --disable-{gdb,libdecnumber,readline,sim} --without-stage1-ldflags
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-nls --with-system-zlib --enable-obsolete --enable-threads --enable-install-libiberty --disable-werror --disable-{gdb,libdecnumber,readline,sim} --without-stage1-ldflags
 make ${JOBSFLAGS}
 ${CROSS_TC}-strip --strip-unneeded binutils/objdump
 cp binutils/objdump ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/objdump
@@ -3079,21 +3627,54 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	cp binutils/readelf ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/readelf
 fi
 
+## FBInk
+echo "* Building FBInk . . ."
+echo ""
+cd ..
+rm -rf FBInk
+# NOTE: Not shallow because we want a proper version tag
+until git clone --recurse-submodules https://github.com/NiLuJe/FBInk.git ; do
+	rm -rf FBInk
+	sleep 15
+done
+cd FBInk
+update_title_info
+if [[ "${KINDLE_TC}" == "K3" ]] ; then
+	make ${JOBSFLAGS} legacy
+	cp Release/fbink ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbink
+	make clean
+	make ${JOBSFLAGS} legacy MINIMAL=1
+	cp Release/fbink ${BASE_HACKDIR}/Common/bin/fbink
+elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] ; then
+	make ${JOBSFLAGS} kindle
+	cp Release/fbink ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbink
+	make clean
+	make ${JOBSFLAGS} kindle MINIMAL=1
+	cp Release/fbink ${BASE_HACKDIR}/Common/bin/fbink
+else
+	make ${JOBSFLAGS} strip
+	cp Release/fbink ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbink
+fi
+
 ## cURL
 #
-#patch -p0 < /usr/portage/net-misc/curl/files/curl-7.18.2-prefix.patch
+#patch -p1 < /usr/portage/net-misc/curl/files/curl-7.30.0-prefix.patch
 #patch -p1 < /usr/portage/net-misc/curl/files/curl-respect-cflags-3.patch
 #patch -p1 < /usr/portage/net-misc/curl/files/curl-fix-gnutls-nettle.patch
 #sed -i '/LD_LIBRARY_PATH=/d' configure.ac
 #
-#env LIBS="-lz -ldl" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --without-axtls --without-cyassl --without-gnutls --without-nss --without-polarssl --without-ssl --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt --with-ssl --without-ca-bundle --with-ca-path=/etc/ssl/certs --enable-dict --enable-file --enable-ftp --enable-gopher --enable-http --enable-imap --enable-pop3 --without-librtmp --enable-rtsp --disable-ldap --disable-ldaps --without-libssh2 --enable-smtp --enable-telnet -enable-tftp --disable-ares --enable-cookies --enable-hidden-symbols --disable-ipv6 --enable-largefile --enable-manual --enable-nonblocking --enable-proxy --disable-soname-bump --disable-sspi --disable-threaded-resolver --disable-versioned-symbols --without-libidn --without-gssapi --without-krb4 --without-spnego --with-zlib
+#autoreconf -fi
 #
-#make ${JOBSFLAGS}
+#make ca-bundle
+#
+#env LIBS="-ldl" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --without-axtls --without-gnutls --without-mbedtls --without-nss --without-polarssl --without-ssl --without-winssl --with-ca-fallback --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt --with-ssl --with-ca-path=/etc/ssl/certs --enable-crypto-auth --enable-dict --enable-file --enable-ftp --enable-gopher --enable-http --enable-imap --disable-ldap --disable-ldaps --disable-ntlm-wb --enable-pop3 --enable-rt --enable-rtsp --disable-smb --without-libssh2 --enable-smtp --enable-telnet -enable-tftp --enable-tls-srp --disable-ares --enable-cookies --enable-hidden-symbols --disable-ipv6 --enable-largefile --without-libpsl --enable-manual --enable-proxy --disable-sspi --enable-threaded-resolver --enable-pthreads --disable-versioned-symbols --without-cyassl --without-darwinssl --without-libidn2 --without-gssapi --without-libmetalink --without-nghttp2 --without-librtmp --without-brotli --without-spnego --without-winidn --without-wolfssl --with-zlib
+#
+#make ${JOBSFLAGS} V=1 LIBCURL_LIBS="-l:libssl.a -l:libcrypto.a -l:libz.a -ldl -lrt"
 #
 #${CROSS_TC}-strip --strip-unneeded src/curl
 #
-# NOTE: Even with shared=no static=yes, I ended up with NEEDED entries for shared libraries for everything except OpenSSL (because I don't *have* a shared library for it), and it avoided the PIC issues entirely, without needing to build OpenSSL PIC...
-# FIXME: Try this on every project that had a PIC issue?
+# NOTE (OLD): Even with shared=no static=yes, I ended up with NEEDED entries for shared libraries for everything except OpenSSL (because I don't *have* a shared library for it), and it avoided the PIC issues entirely, without needing to build OpenSSL PIC...
+# XXX: Try this on every project that had a PIC issue?
 #
 ##
 
@@ -3113,6 +3694,3 @@ fi
 #unset ac_cv_lib_{z_compress,dl_{dlopen,shl_load}} ac_cv_{header_pcre_h,lib_pcre_pcre_compile} ac_cv_{header_uuid_uuid_h,lib_uuid_uuid_generate} PKG_CONFIG
 #
 ##
-
-
-## TODO: Build kpdfviewer?
