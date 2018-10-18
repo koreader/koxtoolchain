@@ -8,7 +8,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 14796 2018-04-14 15:22:18Z NiLuJe $
+# $Id: x-compile.sh 15482 2018-10-17 15:48:55Z NiLuJe $
 #
 # kate: syntax bash;
 #
