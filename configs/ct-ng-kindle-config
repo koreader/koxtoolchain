@@ -14,6 +14,7 @@ CT_CONFIGURE_has_autoconf_2_63_or_newer=y
 CT_CONFIGURE_has_autoreconf_2_63_or_newer=y
 CT_CONFIGURE_has_automake_1_15_or_newer=y
 CT_CONFIGURE_has_gnu_m4_1_4_12_or_newer=y
+CT_CONFIGURE_has_cvs=y
 CT_CONFIGURE_has_svn=y
 CT_CONFIGURE_has_git=y
 CT_MODULES=y
@@ -276,9 +277,10 @@ CT_BINUTILS_binutils=y
 # GNU binutils
 #
 # CT_BINUTILS_CUSTOM is not set
-CT_BINUTILS_VERSION="2.30"
+CT_BINUTILS_VERSION="2.31.1"
 # CT_BINUTILS_SHOW_LINARO is not set
-CT_BINUTILS_V_2_30=y
+CT_BINUTILS_V_2_31_1=y
+# CT_BINUTILS_V_2_30 is not set
 # CT_BINUTILS_V_2_29_1 is not set
 # CT_BINUTILS_V_2_28_1 is not set
 # CT_BINUTILS_V_2_27 is not set
@@ -330,6 +332,7 @@ CT_LIBC_glibc_AVAILABLE=y
 CT_THREADS="nptl"
 # CT_LIBC_GLIBC_CUSTOM is not set
 # CT_CC_GLIBC_SHOW_LINARO is not set
+# CT_LIBC_GLIBC_V_2_28 is not set
 # CT_LIBC_GLIBC_V_2_27 is not set
 # CT_LIBC_GLIBC_V_2_26 is not set
 # CT_LIBC_GLIBC_V_2_25 is not set
