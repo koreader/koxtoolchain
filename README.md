@@ -1,11 +1,11 @@
-KOReader Cross Compile ToolChain
+# KOReader Cross Compile ToolChain
 ================================
 
 Build scripts to help generate cross toolchains for various platforms supported
 by KOReader.
 
 
-Dependencies
+## Dependencies
 ------------
 
 * gperf
@@ -15,22 +15,34 @@ Dependencies
 * flex
 * gawk
 
-For ubuntu user:
+## For Ubuntu user:
 
 ```bash
 sudo apt-get install gperf help2man bison texinfo flex gawk
 ```
 
-Usage
+## Usage
 -----
-The build script takes platform name as its first argument. For example, to
-build a cross toolchina for legacy non-touch kindle devices, type:
+The build script takes a platform name as its first argument.
+For example, to build a cross toolchain for legacy non-touch kindle devices, type:
 
 ```
-./gen-tc.sh kindlepw2
+./gen-tc.sh kindle
 ```
 
 You can use `./gen-tc.sh -h` to get a list of supported platforms.
 
 After the build is finished, you should be able to find your cross toolchains
 under `~/x-tools` directory.
+
+## Notes
+
+Due to a whole lot of legacy baggage, the names of the various Kindle TC may be slightly confusing (especially compared to KOReader's target names), so, let's disambiguate that:
+
+|     TC    |       Supported Devices       |     Target    |
+|:---------:|:-----------------------------:|:-------------:|
+|   kindle  |      Kindle 2, DX, DXg, 3     | kindle-legacy |
+|  kindle5  |      Kindle 4, Touch, PW1     |     kindle    |
+| kindlepw2 | Kindle PW2 & everything since |   kindlepw2   |
+
+No such worries on Kobo & Cervantes, though ;).
