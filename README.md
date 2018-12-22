@@ -42,3 +42,11 @@ Due to a whole lot of legacy baggage, the names of the various Kindle TCs may be
 | kindlepw2 | Kindle PW2 & everything since |   kindlepw2   |
 
 No such worries on Kobo & Cervantes, though ;).
+
+## Known Issues
+
+Only actively tested on Linux hosts.
+May not behave properly on Arch Linux, if their ban on static libraries is still in place.
+May work on macOS with some efforts, if you follow crosstool-ng's recommendations on the subject.
+May work on windows with even more efforts, but I wouldn't bother.
+When in doubt, use a Debian VM.
