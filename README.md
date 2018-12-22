@@ -1,12 +1,10 @@
 # KOReader Cross Compile ToolChain
-================================
 
 Build scripts to help generate cross toolchains for various platforms supported
 by KOReader.
 
 
 ## Dependencies
-------------
 
 * gperf
 * help2man
@@ -22,7 +20,7 @@ sudo apt-get install gperf help2man bison texinfo flex gawk
 ```
 
 ## Usage
------
+
 The build script takes a platform name as its first argument.
 For example, to build a cross toolchain for legacy non-touch kindle devices, type:
 
