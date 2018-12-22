@@ -1,4 +1,4 @@
-# KOReader Cross Compile ToolChain
+# KOReader Cross Compile ToolChains
 
 Build scripts to help generate cross ToolChains for various platforms supported by KOReader.
 
