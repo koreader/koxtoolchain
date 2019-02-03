@@ -100,31 +100,31 @@ case $1 in
 	kobo)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			8b1358a286d2df3deb71d6f041ad2064b555fa43 \
+			2eba7ca08e6b52dff0806df05ee799587399a433 \
 			${CUR_DIR}/configs/ct-ng-kobo-config
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			8b1358a286d2df3deb71d6f041ad2064b555fa43 \
+			2eba7ca08e6b52dff0806df05ee799587399a433 \
 			${CUR_DIR}/configs/ct-ng-kindlepw2-config
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			8b1358a286d2df3deb71d6f041ad2064b555fa43 \
+			2eba7ca08e6b52dff0806df05ee799587399a433 \
 			${CUR_DIR}/configs/ct-ng-kindle5-config
 		;;
 	kindle)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			8b1358a286d2df3deb71d6f041ad2064b555fa43 \
+			2eba7ca08e6b52dff0806df05ee799587399a433 \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			8b1358a286d2df3deb71d6f041ad2064b555fa43 \
+			2eba7ca08e6b52dff0806df05ee799587399a433 \
 			${CUR_DIR}/configs/ct-ng-cervantes-config
 		;;
 	*)
