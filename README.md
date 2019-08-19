@@ -43,10 +43,12 @@ Due to a whole lot of legacy baggage, the names of the various Kindle TCs may be
 
 No such worries on Kobo & Cervantes, though ;).
 
+The nickel TC is a Kobo variant that mimics Kobo's own TC (as of FW >= 4.6). It is *not* recommended for general purpose stuff, only use it if you have a specific need for it (which should essentially be limited to working with Kobo's nickel, or Kobo's kernels).
+
 ## Known Issues
 
-Only actively tested on Linux hosts.  
-May not behave properly on Arch Linux, if their ban on static libraries is still in place.  
-May work on macOS with some efforts, if you follow crosstool-ng's recommendations on the subject.  
-May work on Windows with even more efforts, but I wouldn't bother.  
+Only actively tested on Linux hosts.
+May not behave properly on Arch Linux, if their ban on static libraries is still in place.
+May work on macOS with some efforts, if you follow crosstool-ng's recommendations on the subject.
+May work on Windows with even more efforts, but I wouldn't bother.
 When in doubt, use a Debian VM.

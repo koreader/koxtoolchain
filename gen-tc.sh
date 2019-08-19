@@ -83,6 +83,7 @@ Supported platforms:
 	kindle5
 	kindlepw2
 	kobo
+	nickel
 	cervantes
 "
 
@@ -102,6 +103,12 @@ case $1 in
 			https://github.com/NiLuJe/crosstool-ng.git \
 			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
 			${CUR_DIR}/configs/ct-ng-kobo-config
+		;;
+	nickel)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			${CUR_DIR}/configs/ct-ng-nickel-config
 		;;
 	kindlepw2)
 		Build_CT-NG \
