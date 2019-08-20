@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16388 2019-08-19 15:49:55Z NiLuJe $
+# $Id: x-compile.sh 16397 2019-08-19 21:54:01Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -608,10 +608,12 @@ case ${KINDLE_TC} in
 		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
 		if [[ "${KINDLE}" == "KOBO" ]] ; then
 			CROSS_TC="arm-kobo-linux-gnueabihf"
+			TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 		else
 			CROSS_TC="arm-nickel-linux-gnueabihf"
+			# NOTE: We use a directory tree slightly more in line w/ ct-ng here...
+			TC_BUILD_DIR="${HOME}/Kobo/CrossTool/Build_${KINDLE_TC}/${CROSS_TC}/${CROSS_TC}/sysroot"
 		fi
-		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 
 		# Export it for our CMakeCross TC file
 		export CROSS_TC
