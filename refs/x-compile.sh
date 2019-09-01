@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16397 2019-08-19 21:54:01Z NiLuJe $
+# $Id: x-compile.sh 16431 2019-09-01 14:00:36Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -90,20 +90,73 @@ update_title_info()
 }
 
 ## Install/Setup CrossTool-NG
-Build_CT-NG() {
-	echo "* Building CrossTool-NG . . ."
+Build_CT-NG-Legacy() {
+	echo "* Building CrossTool-NG 1.23 . . ."
 	echo ""
 	cd ${HOME}/Kindle
 	mkdir -p CrossTool
 	cd CrossTool
 
 	# Remove previous CT-NG install...
-	rm -rf bin CT-NG lib share
+	rm -rf CT-NG
 
 	mkdir -p CT-NG
 	cd CT-NG
 	# Pull our own CT-NG branch, which includes a few tweaks needed to support truly old glibc & kernel versions...
-	git clone -b 1.23-kindle --single-branch --depth 1 https://github.com/NiLuJe/crosstool-ng.git .
+	git clone -b 1.23-kindle --single-branch https://github.com/NiLuJe/crosstool-ng.git .
+
+	git clean -fxdq
+	./bootstrap
+	./configure --enable-local
+	make -j8
+
+	# We need a clean set of *FLAGS, or shit happens...
+	unset CFLAGS CXXFLAGS LDFLAGS
+
+	## And then build every TC one after the other...
+	for my_tc in kindle kindle5 kindlepw2 kobo ; do
+		echo ""
+		echo "* Building the ${my_tc} ToolChain . . ."
+		echo ""
+
+		# Start by removing the old TC...
+		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi
+		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf
+		# Then backup the current one...
+		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabi" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabi
+		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabihf" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabihf
+
+		# Clean the WD
+		./ct-ng clean
+
+		# Build the config from this TC's sample
+		./ct-ng $(find samples -type d -name "arm-${my_tc}-linux-gnueabi*" | cut -d'/' -f2)
+
+		# And fire away!
+		./ct-ng oldconfig
+		#./ct-ng menuconfig
+
+		./ct-ng updatetools
+
+		nice ./ct-ng build
+	done
+}
+
+## Install/Setup CrossTool-NG
+Build_CT-NG() {
+	echo "* Building CrossTool-NG 1.24 . . ."
+	echo ""
+	cd ${HOME}/Kindle
+	mkdir -p CrossTool
+	cd CrossTool
+
+	# Remove previous CT-NG install...
+	rm -rf CT-NG
+
+	mkdir -p CT-NG
+	cd CT-NG
+	# Pull our own CT-NG branch, which includes a few tweaks needed to support truly old glibc & kernel versions...
+	git clone -b 1.24-kindle --single-branch https://github.com/NiLuJe/crosstool-ng.git .
 	# This also often includes the latest Linaro GCC versions...
 	# But, more generally,
 	# This includes the Make-3.82 patch to Glibc 2.9 too, because it fails to build in softfp with make 3.81... -_-" [Cf. http://lists.gnu.org/archive/html/help-make/2012-02/msg00025.html]
@@ -126,27 +179,29 @@ Build_CT-NG() {
 	# XXX: Building the PW2 TC against glibc 2.19, on the other hand, results in working binaries... WTF?! (5.3 2016.03 snapshot)
 	# NOTE: Joy? The issue appears to be fixed in Linaro GCC 5.3 2016.04 snapshot! :)
 
-	# FIXME: I'm seriously considering adding proper support for binutil's native handling of the LTO plugin, via lib/bfd-plugins, instead of relying on the GCC wrappers...
+	# XXX: I'm seriously considering adding proper support for binutil's native handling of the LTO plugin, via lib/bfd-plugins, instead of relying on the GCC wrappers...
 	#        cd ${HOME}/x-tools/arm-kobo-linux-gnueabihf
 	#        mkdir -p lib/bfd-plugins
 	#        cd lib/bfd-plugins
 	#        ln -sf ../../libexec/gcc/arm-kobo-linux-gnueabihf/7.3.1/liblto_plugin.so.0.0.0 liblto_plugin.so
+	# NOTE: This *should* be automatically taken care of on ct-ng 1.24 ;).
 
+	# NOTE: Performance appears to have gone *noticeably* down between GCC Linaro 7.4 and ARM 8.3 (and even more sharply between ARM 8.3 & FSF 9.2)... :/
+	#       Possibly related: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91598
+	#       TL;DR: We're not moving away from the final Linaro TC for now. Yay?
+	#              The good news is all the work involved in moving to ct-ng 1.24 is done, and building Linaro 7.4 also works there, FWIW.
+
+	git clean -fxdq
 	./bootstrap
-	./configure --prefix=${HOME}/Kindle/CrossTool
-	make
-	make install
-	export PATH="${PATH}:${HOME}/Kindle/CrossTool/bin"
-
-	cd ..
-	mkdir -p TC_Kindle
-	cd TC_Kindle
+	./configure --enable-local
+	make -j8
 
 	# We need a clean set of *FLAGS, or shit happens...
 	unset CFLAGS CXXFLAGS LDFLAGS
 
 	## And then build every TC one after the other...
-	for my_tc in kindle kindle5 kindlepw2 kobo ; do
+	## FIXME: kindle is broken in the 1.24 branch (The pass-2 core C gcc compiler fails to build libgcc with a multiple definition of `__libc_use_alloca' link failure), for some reason...
+	for my_tc in kindle5 kindlepw2 kobo ; do
 		echo ""
 		echo "* Building the ${my_tc} ToolChain . . ."
 		echo ""
@@ -158,20 +213,25 @@ Build_CT-NG() {
 		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabi" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabi
 		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabihf" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabihf
 
-		# Clean the WD manually (clean & distclean are both a little bit too enthusiastic)
-		rm -rf build.log config .config.2 .config.old config.gen .build/arm-kindle-linux-gnueabi .build/arm-kindle5-linux-gnueabi .build/arm-kindlepw2-linux-gnueabi .build/arm-kobo-linux-gnueabi .build/arm-kobo-linux-gnueabihf .build/arm-nickel-linux-gnueabihf .build/src .build/tools
+		# Clean the WD
+		./ct-ng distclean
 
-		# Get the current config for this TC...
-		cp ${SVN_ROOT}/Configs/trunk/Kindle/Misc/ct-ng-${my_tc}-config .config
+		# Build the config from this TC's sample
+		./ct-ng $(find samples -type d -name "arm-${my_tc}-linux-gnueabi*" | cut -d'/' -f2)
 
 		# And fire away!
-		ct-ng oldconfig
-		#ct-ng menuconfig
+		./ct-ng oldconfig
+		#./ct-ng menuconfig
 
-		ct-ng updatetools
+		./ct-ng updatetools
 
-		nice ct-ng build
+		nice ./ct-ng build
 	done
+
+	## NOTE: Do that ourselves?
+	echo ""
+	echo "* You can now remove the source tarballs ct-ng downloaded in ${HOME}/src . . ."
+	echo ""
 
 	## Config Hints:
 	cat << EOF > /dev/null
@@ -189,7 +249,7 @@ Build_CT-NG() {
 	Bitness: 32-bit
 	Instruction set: arm
 	Arch level: armv6j	|	armv7-a
-	CPU: arm1136jf-s	|	cortex-a8	|	cortex-a9	# NOTE: Prefer setting CPU instead of Arch & Tune.
+	CPU: arm1136jf-s	|	cortex-a8	|	cortex-a9	# NOTE: Prefer setting CPU instead of Arch & Tune (??!!).
 	Tune: arm1136jf-s	|	cortex-a8	|	cortex-a9
 	FPU: vfp		|	neon or vfpv3
 	Floating point: softfp				# NOTE: Can't use hardf, it requires a linux-armhf loader (also, terrible idea to mix ABIs). Interwork is meaningless on ARMv6+. K5: I'm not sure Amazon defaults to Thumb2, but AFAICT we can use it safely.
@@ -269,7 +329,9 @@ case ${1} in
 	;;
 	# Or build them?
 	tc )
-		Build_CT-NG
+		Build_CT-NG-Legacy
+		# FIXME: See the NOTE above about perf regression for why we don't move to GCC 8 or 9...
+		#Build_CT-NG
 		# And exit happy now :)
 		exit 0
 	;;
@@ -606,7 +668,7 @@ case ${KINDLE_TC} in
 	;;
 	KOBO | NICKEL )
 		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
-		if [[ "${KINDLE}" == "KOBO" ]] ; then
+		if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 			CROSS_TC="arm-kobo-linux-gnueabihf"
 			TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 		else
@@ -774,6 +836,7 @@ if [[ "${USE_ZLIB_NG}" == "true" ]] ; then
 	echo "* Building zlib-ng . . ."
 	echo ""
 	ZLIB_SOVER="1.2.11.zlib-ng"
+	rm -rf zlib-ng
 	until git clone --depth 1 https://github.com/zlib-ng/zlib-ng.git ; do
 		rm -rf zlib-ng
 		sleep 15
@@ -845,7 +908,7 @@ Build_FreeType_Stack() {
 	# Funnily enough, it depends on freetype too...
 	# NOTE: I thought I *might* have to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512,
 	#       but in practice in turns out that wasn't needed ;).
-	FT_VER="2.10.1_p20190723"
+	FT_VER="2.10.1_p20190827"
 	FT_SOVER="6.17.1"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
@@ -869,13 +932,13 @@ Build_FreeType_Stack() {
 	echo "* Building harfbuzz . . ."
 	echo ""
 	cd ..
-	HB_SOVER="0.20600.0"
+	HB_SOVER="0.20600.1"
 	#rm -rf harfbuzz
 	#tar -xvJf /usr/portage/distfiles/harfbuzz-2.6.0_p20190813.tar.xz
 	#cd harfbuzz
-	rm -rf harfbuzz-2.6.0
-	tar -xvJf /usr/portage/distfiles/harfbuzz-2.6.0.tar.xz
-	cd harfbuzz-2.6.0
+	rm -rf harfbuzz-2.6.1
+	tar -xvJf /usr/portage/distfiles/harfbuzz-2.6.1.tar.xz
+	cd harfbuzz-2.6.1
 	update_title_info
 	env NOCONFIGURE=1 sh autogen.sh
 	# Make sure libtool doesn't eat any our of our CFLAGS when linking...
@@ -1071,7 +1134,7 @@ unset scanf_cv_alloc_modifier
 echo "* Building fontconfig . . ."
 echo ""
 FC_SOVER="1.12.0"
-FC_VER="2.13.91_p20190809"
+FC_VER="2.13.91_p20190829"
 cd ..
 tar -xvJf /usr/portage/distfiles/fontconfig-${FC_VER}.tar.xz
 cd fontconfig
@@ -1609,10 +1672,10 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	sed -i '/^"debug-ben-debug-64"/d' Configure
 	sed -i '/^"debug-steve/d' Configure
 	#./Configure linux-generic32 -DL_ENDIAN ${BASE_CFLAGS} -fno-strict-aliasing enable-camellia enable-mdc2 enable-tlsext enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
-	./Configure linux-generic32 -DL_ENDIAN ${CFLAGS} enable-camellia enable-ec enable-idea enable-mdc2 enable-rc5 enable-tlsext enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
-	grep '^CFLAG=' Makefile | LC_ALL=C sed -e 's:^CFLAG=::' -e 's:-ffast-math ::g' -e 's:-fomit-frame-pointer ::g' -e 's:-O[0-9] ::g' -e 's:-march=[-a-z0-9]* ::g' -e 's:-mcpu=[-a-z0-9]* ::g' -e 's:-m[a-z0-9]* ::g' > x-compile-tmp
-	CFLAG="$(< x-compile-tmp)"
-	sed -i -e "/^CFLAG/s:=.*:=${CFLAG} ${CFLAGS}:" -e "/^SHARED_LDFLAGS=/s:$: ${LDFLAGS}:" Makefile
+	env CFLAGS= LDFLAGS= ./Configure linux-generic32 -DL_ENDIAN enable-camellia enable-ec enable-idea enable-mdc2 enable-rc5 enable-tlsext enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
+	grep '^CFLAG=' Makefile | LC_ALL=C sed -e 's:^CFLAG=::' -e 's:\(^\| \)-ffast-math::g' -e 's:\(^\| \)-fomit-frame-pointer::g' -e 's:\(^\| \)-O[^ ]*::g' -e 's:\(^\| \)-march=[^ ]*::g' -e 's:\(^\| \)-mcpu=[^ ]*::g' -e 's:\(^\| \)-m[^ ]*::g' -e 's:^ *::' -e 's: *$::' -e 's: \+: :g' -e 's:\\:\\\\:g' > x-compile-tmp
+	DEFAULT_CFLAGS="$(< x-compile-tmp)"
+	sed -i -e "/^CFLAG/s:=.*:=${DEFAULT_CFLAGS} ${CFLAGS}:" -e "/^SHARED_LDFLAGS=/s:$: ${LDFLAGS}:" Makefile
 	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" depend
 	make -j1 AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" build_libs
 	make AR="${CROSS_TC}-gcc-ar r" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" install
@@ -1625,6 +1688,7 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	done
 	export CFLAGS="${BASE_CFLAGS}"
 	export LDFLAGS="${BASE_LDFLAGS}"
+	unset DEFAULT_CFLAGS
 elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	# NOTE: We build & link it statically for K4/K5 because KT 5.1.0 move from openssl-0.9.8 to openssl-1...
 	echo "* Building OpenSSL 1.1.0 . . ."
@@ -1669,8 +1733,8 @@ elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KIND
 	#unset CROSS_COMPILE
 	# We need it to be PIC, or mosh fails to link (not an issue anymore, now that we use a shared lib)
 	#./Configure linux-armv4 -DL_ENDIAN ${BASE_CFLAGS} -fno-strict-aliasing enable-camellia enable-mdc2 enable-tlsext enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
-	./Configure linux-armv4 -DL_ENDIAN ${CFLAGS} enable-camellia enable-ec enable-srp enable-idea enable-mdc2 enable-rc5 enable-asm enable-heartbeats enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
-	grep '^CFLAGS=' Makefile | LC_ALL=C sed -e 's:^CFLAGS=::' -e 's:-ffast-math ::g' -e 's:-fomit-frame-pointer ::g' -e 's:-O[0-9] ::g' -e 's:-march=[-a-z0-9]* ::g' -e 's:-mcpu=[-a-z0-9]* ::g' -e 's:-m[a-z0-9]* ::g' -e 's:\\:\\\\:g' > x-compile-tmp
+	env CFLAGS= LDFLAGS= ./Configure linux-armv4 -DL_ENDIAN enable-camellia enable-ec enable-srp enable-idea enable-mdc2 enable-rc5 enable-asm enable-heartbeats enable-zlib --prefix=${TC_BUILD_DIR} --openssldir=${TC_BUILD_DIR}/etc/ssl shared threads
+	grep '^CFLAGS=' Makefile | LC_ALL=C sed -e 's:^CFLAGS=::' -e 's:\(^\| \)-fomit-frame-pointer::g' -e 's:\(^\| \)-O[^ ]*::g' -e 's:\(^\| \)-march=[^ ]*::g' -e 's:\(^\| \)-mcpu=[^ ]*::g' -e 's:\(^\| \)-m[^ ]*::g' -e 's:^ *::' -e 's: *$::' -e 's: \+: :g' -e 's:\\:\\\\:g' > x-compile-tmp
 	DEFAULT_CFLAGS="$(< x-compile-tmp)"
 	sed -i -e "/^CFLAGS=/s|=.*|=${DEFAULT_CFLAGS} ${CFLAGS}|" -e "/^LDFLAGS=/s|=[[:space:]]*$|=${LDFLAGS}|" Makefile
 	# Make sure our own LDFLAGS won't get dropped at link time, because we need 'em to properly pickup zlib...
@@ -1690,6 +1754,7 @@ elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] || [[ "${KIND
 	export CPPFLAGS="${BASE_CPPFLAGS}"
 	export CFLAGS="${BASE_CFLAGS}"
 	export LDFLAGS="${BASE_LDFLAGS}"
+	unset DEFAULT_CFLAGS
 fi
 
 echo "* Building OpenSSH . . ."
@@ -4217,8 +4282,8 @@ cp -f ${DEVICE_USERSTORE}/usbnet/share/misc/magic.mgc ${BASE_HACKDIR}/USBNetwork
 echo "* Building nano . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/nano-4.3.tar.gz
-cd nano-4.3
+tar -I pigz -xvf /usr/portage/distfiles/nano-4.4.tar.gz
+cd nano-4.4
 update_title_info
 # NOTE: On Kindles, we hit a number of dumb collation issues with regexes needed for syntax highlighting on some locales (notably en_GB...) on some FW versions, so enforce en_US...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/nano-kindle-locale-hack.patch
@@ -4303,6 +4368,7 @@ find ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/zsh -name '*.so*' -type f -exec $
 mkdir -p ${BASE_HACKDIR}/USBNetwork/src/usbnet/share/zsh
 cp -aL ${DEVICE_USERSTORE}/usbnet/share/zsh/. ${BASE_HACKDIR}/USBNetwork/src/usbnet/share/zsh
 # Now, get the latest dircolors-solarized db, because the default one is eye-poppingly awful
+rm -rf dircolors-solarized
 until git clone --depth 1 https://github.com/seebi/dircolors-solarized.git ; do
 	rm -rf dircolors-solarized
 	sleep 15
@@ -4310,6 +4376,7 @@ done
 mkdir -p ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/zsh
 cp -f dircolors-solarized/dircolors.* ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/zsh/
 # Then, take care of zsh-syntax-highlighting
+rm -rf zsh-syntax-highlighting
 until git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git ; do
 	rm -rf zsh-syntax-highlighting
 	sleep 15
