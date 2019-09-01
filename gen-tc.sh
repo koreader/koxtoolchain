@@ -8,7 +8,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16388 2019-08-19 15:49:55Z NiLuJe $
+# $Id: x-compile.sh 16431 2019-09-01 14:00:36Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -101,37 +101,39 @@ case $1 in
 	kobo)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
 			${CUR_DIR}/configs/ct-ng-kobo-config
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
 			${CUR_DIR}/configs/ct-ng-nickel-config
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
 			${CUR_DIR}/configs/ct-ng-kindlepw2-config
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
 			${CUR_DIR}/configs/ct-ng-kindle5-config
 		;;
 	kindle)
+		# NOTE: Don't swap away from the 1.23-kindle branch,
+		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
 			${CUR_DIR}/configs/ct-ng-kindle-config
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			641c555bcb4c98ec1a27c13f7f4d6415b7d31535 \
+			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
 			${CUR_DIR}/configs/ct-ng-cervantes-config
 		;;
 	*)
