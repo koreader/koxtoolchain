@@ -21,16 +21,14 @@ DEFAULT_GIT_REPO="https://github.com/crosstool-ng/crosstool-ng.git"
 
 Build_CT-NG() {
 	echo "[*] Building CrossTool-NG . . ."
-	ct_ng_git_repo=$1
+	ct_ng_git_repo="$1"
 	shift
-	ct_ng_commit=$1
+	ct_ng_commit="$1"
 	shift
-	cfg_path=$1
-	PARALLEL_JOBS=$(($(getconf _NPROCESSORS_ONLN 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 0) + 1))
+	tc_target="$1"
 	echo "[-] ct-ng git repo: ${ct_ng_git_repo}"
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
-	echo "[-] ct-ng config path: ${cfg_path}"
-	echo "[-] compiling with ${PARALLEL_JOBS} parallel jobs"
+	echo "[-] toolchain target: ${tc_target}"
 
 	[ ! -d ${BUILD_ROOT} ] && mkdir -p ${BUILD_ROOT}
 	pushd ${BUILD_ROOT}
@@ -42,6 +40,7 @@ Build_CT-NG() {
 			git remote add origin ${ct_ng_git_repo}
 			git fetch origin
 			git checkout ${ct_ng_commit}
+			git clean -fxdq
 			./bootstrap
 			[ ! -d ${BUILD_ROOT}/CT_NG_BUILD ] && mkdir -p ${BUILD_ROOT}/CT_NG_BUILD
 			./configure --prefix=${BUILD_ROOT}/CT_NG_BUILD
@@ -49,26 +48,20 @@ Build_CT-NG() {
 			make install
 			export PATH="${PATH}:${BUILD_ROOT}/CT_NG_BUILD/bin"
 		popd
-		cfg_name=$(basename ${cfg_path})
-		# extract platform from config name
-		tmp_str=${cfg_name#ct-ng-}
-		TC_BUILD_DIR=${tmp_str%*-config}
+		# extract platform from target tuple
+		tmp_str="${tc_target#*-}"
+		TC_BUILD_DIR="${tmp_str%%-*}"
 		[ ! -d ${TC_BUILD_DIR} ] && mkdir -p ${TC_BUILD_DIR}
 		pushd ${TC_BUILD_DIR}
 			ct-ng distclean
 
 			unset CFLAGS CXXFLAGS LDFLAGS
-			cp ${cfg_path} .config
-			echo "CT_PARALLEL_JOBS=${PARALLEL_JOBS}" >> .config
+			ct-ng ${tc_target}
 			ct-ng oldconfig
-			# ct-ng menuconfig
 			ct-ng updatetools
 			nice ct-ng build
-			pushd .build
-				tc_prefix=$(ls -d arm-*)
-			popd
 			echo "[INFO ]  ================================================================="
-			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_prefix}/bin to your PATH."
+			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_target}/bin to your PATH."
 			echo "[INFO ]  ================================================================="
 		popd
 	popd
@@ -99,28 +92,29 @@ case $1 in
 		exit 0
 		;;
 	kobo)
+		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			${CUR_DIR}/configs/ct-ng-kobo-config
+			arm-${1}-linux-gnueabihf
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			${CUR_DIR}/configs/ct-ng-nickel-config
+			arm-${1}-linux-gnueabihf
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			${CUR_DIR}/configs/ct-ng-kindlepw2-config
+			arm-${1}-linux-gnueabi
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			${CUR_DIR}/configs/ct-ng-kindle5-config
+			arm-${1}-linux-gnueabi
 		;;
 	kindle)
 		# NOTE: Don't swap away from the 1.23-kindle branch,
@@ -128,13 +122,13 @@ case $1 in
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			${CUR_DIR}/configs/ct-ng-kindle-config
+			arm-${1}-linux-gnueabi
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			${CUR_DIR}/configs/ct-ng-cervantes-config
+			arm-${1}-linux-gnueabi
 		;;
 	*)
 		echo "[!] $1 not supported!"
