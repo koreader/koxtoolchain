@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16431 2019-09-01 14:00:36Z NiLuJe $
+# $Id: x-compile.sh 16432 2019-09-01 15:03:14Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -108,7 +108,7 @@ Build_CT-NG-Legacy() {
 	git clean -fxdq
 	./bootstrap
 	./configure --enable-local
-	make -j8
+	make -j$(nproc)
 
 	# We need a clean set of *FLAGS, or shit happens...
 	unset CFLAGS CXXFLAGS LDFLAGS
@@ -194,7 +194,7 @@ Build_CT-NG() {
 	git clean -fxdq
 	./bootstrap
 	./configure --enable-local
-	make -j8
+	make -j$(nproc)
 
 	# We need a clean set of *FLAGS, or shit happens...
 	unset CFLAGS CXXFLAGS LDFLAGS
