@@ -26,8 +26,10 @@ Build_CT-NG() {
 	ct_ng_commit="$1"
 	shift
 	tc_target="$1"
+	PARALLEL_JOBS=$(($(getconf _NPROCESSORS_ONLN 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 0) + 1))
 	echo "[-] ct-ng git repo: ${ct_ng_git_repo}"
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
+	echo "[-] compiling with ${PARALLEL_JOBS} parallel jobs"
 	echo "[-] toolchain target: ${tc_target}"
 
 	[ ! -d "${BUILD_ROOT}" ] && mkdir -p "${BUILD_ROOT}"
@@ -44,7 +46,7 @@ Build_CT-NG() {
 			./bootstrap
 			[ ! -d "${BUILD_ROOT}/CT_NG_BUILD" ] && mkdir -p "${BUILD_ROOT}/CT_NG_BUILD"
 			./configure --prefix="${BUILD_ROOT}/CT_NG_BUILD"
-			make
+			make -j${PARALLEL_JOBS}
 			make install
 			export PATH="${PATH}:${BUILD_ROOT}/CT_NG_BUILD/bin"
 		popd
