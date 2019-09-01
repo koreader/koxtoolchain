@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16432 2019-09-01 15:03:14Z NiLuJe $
+# $Id: x-compile.sh 16434 2019-09-01 15:36:06Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -2140,7 +2140,7 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.4.0_p20190727.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.4.0_p20190901.tar.xz
 cd libarchive
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
@@ -2343,8 +2343,8 @@ IM_SOVER="6.0.0"
 cd ..
 # FWIW, you can pretty much use the same configure line for GraphicsMagick, although the ScreenSavers hack won't work with it.
 # It doesn't appear to need the quantize patch though, it consumes a 'normal' amount of memory by default.
-tar xvJf /usr/portage/distfiles/ImageMagick-6.9.10-60.tar.xz
-cd ImageMagick-6.9.10-60
+tar xvJf /usr/portage/distfiles/ImageMagick-6.9.10-63.tar.xz
+cd ImageMagick-6.9.10-63
 update_title_info
 # Use the same codepath as on iPhone devices to nerf the 65MB alloc of the dither code... (We also use a quantum-depth of 8 to keep the memory usage down)
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/ImageMagick-6.8.6-5-nerf-dither-mem-alloc.patch
