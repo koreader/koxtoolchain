@@ -16,7 +16,7 @@
 ## Using CrossTool-NG (http://crosstool-ng.org/)
 
 CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-BUILD_ROOT=${CUR_DIR}/build
+BUILD_ROOT="${CUR_DIR}/build"
 DEFAULT_GIT_REPO="https://github.com/crosstool-ng/crosstool-ng.git"
 
 Build_CT-NG() {
@@ -30,33 +30,33 @@ Build_CT-NG() {
 	echo "[-] ct-ng commit hash: ${ct_ng_commit}"
 	echo "[-] toolchain target: ${tc_target}"
 
-	[ ! -d ${BUILD_ROOT} ] && mkdir -p ${BUILD_ROOT}
-	pushd ${BUILD_ROOT}
+	[ ! -d "${BUILD_ROOT}" ] && mkdir -p "${BUILD_ROOT}"
+	pushd "${BUILD_ROOT}"
 		if [ ! -d CT-NG ]; then
-			git clone ${ct_ng_git_repo} CT-NG
+			git clone "${ct_ng_git_repo}" CT-NG
 		fi
 		pushd CT-NG
 			git remote rm origin
-			git remote add origin ${ct_ng_git_repo}
+			git remote add origin "${ct_ng_git_repo}"
 			git fetch origin
-			git checkout ${ct_ng_commit}
+			git checkout "${ct_ng_commit}"
 			git clean -fxdq
 			./bootstrap
-			[ ! -d ${BUILD_ROOT}/CT_NG_BUILD ] && mkdir -p ${BUILD_ROOT}/CT_NG_BUILD
-			./configure --prefix=${BUILD_ROOT}/CT_NG_BUILD
+			[ ! -d "${BUILD_ROOT}/CT_NG_BUILD" ] && mkdir -p "${BUILD_ROOT}/CT_NG_BUILD"
+			./configure --prefix="${BUILD_ROOT}/CT_NG_BUILD"
 			make
 			make install
 			export PATH="${PATH}:${BUILD_ROOT}/CT_NG_BUILD/bin"
 		popd
-		# extract platform from target tuple
+		# extract platform name from target tuple
 		tmp_str="${tc_target#*-}"
 		TC_BUILD_DIR="${tmp_str%%-*}"
-		[ ! -d ${TC_BUILD_DIR} ] && mkdir -p ${TC_BUILD_DIR}
-		pushd ${TC_BUILD_DIR}
+		[ ! -d "${TC_BUILD_DIR}" ] && mkdir -p "${TC_BUILD_DIR}"
+		pushd "${TC_BUILD_DIR}"
 			ct-ng distclean
 
 			unset CFLAGS CXXFLAGS LDFLAGS
-			ct-ng ${tc_target}
+			ct-ng "${tc_target}"
 			ct-ng oldconfig
 			ct-ng updatetools
 			nice ct-ng build
@@ -96,25 +96,25 @@ case $1 in
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			arm-${1}-linux-gnueabihf
+			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			arm-${1}-linux-gnueabihf
+			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			arm-${1}-linux-gnueabi
+			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			arm-${1}-linux-gnueabi
+			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
 		# NOTE: Don't swap away from the 1.23-kindle branch,
@@ -122,13 +122,13 @@ case $1 in
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			arm-${1}-linux-gnueabi
+			"arm-${1}-linux-gnueabi"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			9e3824b41aa13edf8d9927a953d781fe83d6c215 \
-			arm-${1}-linux-gnueabi
+			"arm-${1}-linux-gnueabi"
 		;;
 	*)
 		echo "[!] $1 not supported!"
