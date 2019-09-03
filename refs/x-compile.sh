@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16434 2019-09-01 15:36:06Z NiLuJe $
+# $Id: x-compile.sh 16440 2019-09-02 11:38:57Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -190,6 +190,8 @@ Build_CT-NG() {
 	#       Possibly related: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=91598
 	#       TL;DR: We're not moving away from the final Linaro TC for now. Yay?
 	#              The good news is all the work involved in moving to ct-ng 1.24 is done, and building Linaro 7.4 also works there, FWIW.
+	# NOTE: I should also probably revert https://github.com/NiLuJe/crosstool-ng/commit/90c619fe156f997dfe8ec21bb316901ecd264efc
+	#       It doesn't seem to have a noticeable impact in practice, and it *does* break -mcpu GCC 9.2 builds (-march+-mtune are okay, though).
 
 	git clean -fxdq
 	./bootstrap
@@ -327,6 +329,9 @@ case ${1} in
 	nickel | Nickel | NICKEL )
 		KINDLE_TC="NICKEL"
 	;;
+	mk7 | Mk7 | MK7 )
+		KINDLE_TC="MK7"
+	;;
 	# Or build them?
 	tc )
 		Build_CT-NG-Legacy
@@ -336,7 +341,7 @@ case ${1} in
 		exit 0
 	;;
 	* )
-		echo "You must choose a ToolChain! (k3, k5, pw2, kobo or nickel)"
+		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7 or nickel)"
 		echo "Or, alternatively, ask to build them (tc)"
 		exit 1
 	;;
@@ -666,16 +671,28 @@ case ${KINDLE_TC} in
 
 		DEVICE_USERSTORE="/mnt/us"
 	;;
-	KOBO | NICKEL )
-		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
-		if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
-			CROSS_TC="arm-kobo-linux-gnueabihf"
-			TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
+	KOBO | NICKEL | MK7 )
+		if [[ "${KINDLE_TC}" == "MK7" ]] ; then
+			ARCH_FLAGS="-march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard -mthumb"
 		else
-			CROSS_TC="arm-nickel-linux-gnueabihf"
-			# NOTE: We use a directory tree slightly more in line w/ ct-ng here...
-			TC_BUILD_DIR="${HOME}/Kobo/CrossTool/Build_${KINDLE_TC}/${CROSS_TC}/${CROSS_TC}/sysroot"
+			ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
 		fi
+
+		case ${KINDLE_TC} in
+			KOBO )
+				CROSS_TC="arm-kobo-linux-gnueabihf"
+				TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
+			;;
+			NICKEL )
+				CROSS_TC="arm-nickel-linux-gnueabihf"
+				# NOTE: We use a directory tree slightly more in line w/ ct-ng here...
+				TC_BUILD_DIR="${HOME}/Kobo/CrossTool/Build_${KINDLE_TC}/${CROSS_TC}/${CROSS_TC}/sysroot"
+			;;
+			MK7 )
+				CROSS_TC="arm-kobomk7-linux-gnueabihf"
+				TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
+			;;
+		esac
 
 		# Export it for our CMakeCross TC file
 		export CROSS_TC
