@@ -47,7 +47,7 @@ The nickel TC is a Kobo variant that mimics Kobo's own TC (as of FW >= 4.6). It 
 
 ## Known Issues
 
-Only actively tested on Linux hosts.
+Only actively tested on Linux hosts.  
 May work on macOS with some efforts, if you follow crosstool-ng's recommendations on the subject. This is only bound to get worse.  
 May work on Windows with even more efforts, but I wouldn't bother.  
 When in doubt, use a Debian VM.
