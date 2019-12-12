@@ -97,25 +97,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			b437f2d5350e255d67bc5e86dc5efc1d9d10eea1 \
+			42586aa50d84870f12244b6c9acdda982e3719ab \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			b437f2d5350e255d67bc5e86dc5efc1d9d10eea1 \
+			42586aa50d84870f12244b6c9acdda982e3719ab \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			b437f2d5350e255d67bc5e86dc5efc1d9d10eea1 \
+			42586aa50d84870f12244b6c9acdda982e3719ab \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			b437f2d5350e255d67bc5e86dc5efc1d9d10eea1 \
+			42586aa50d84870f12244b6c9acdda982e3719ab \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -123,13 +123,13 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			b437f2d5350e255d67bc5e86dc5efc1d9d10eea1 \
+			42586aa50d84870f12244b6c9acdda982e3719ab \
 			"arm-${1}-linux-gnueabi"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			b437f2d5350e255d67bc5e86dc5efc1d9d10eea1 \
+			42586aa50d84870f12244b6c9acdda982e3719ab \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
