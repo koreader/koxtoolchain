@@ -18,6 +18,11 @@ Build scripts to help generate cross ToolChains for various platforms supported 
 sudo apt-get install gperf help2man bison texinfo flex gawk
 ```
 
+## For Arch users:
+```bash
+sudo pacman -S gperf help2man bison texinfo flex gawk
+```
+
 ## Usage
 
 The build script takes a platform name as its first argument.
