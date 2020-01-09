@@ -12,15 +12,15 @@ Build scripts to help generate cross ToolChains for various platforms supported 
 * flex
 * gawk
 
+## For Arch users:
+```bash
+sudo pacman -S gperf help2man bison texinfo flex gawk
+```
+
 ## For Ubuntu users:
 
 ```bash
 sudo apt-get install gperf help2man bison texinfo flex gawk
-```
-
-## For Arch users:
-```bash
-sudo pacman -S gperf help2man bison texinfo flex gawk
 ```
 
 ## Usage
