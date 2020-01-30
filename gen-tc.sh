@@ -79,6 +79,7 @@ Supported platforms:
 	kindlepw2
 	kobo
 	nickel
+	remarkable
 	cervantes
 "
 
@@ -124,6 +125,12 @@ case $1 in
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			42586aa50d84870f12244b6c9acdda982e3719ab \
+			"arm-${1}-linux-gnueabi"
+		;;
+	remarkable)
+		Build_CT-NG \
+			https://github.com/tcrs/crosstool-ng.git \
+			37c98916a5695553aba294c5d810226cb88f3193 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	cervantes)
