@@ -8,7 +8,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16434 2019-09-01 15:36:06Z NiLuJe $
+# $Id$
 #
 # kate: syntax bash;
 #
@@ -98,25 +98,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			42586aa50d84870f12244b6c9acdda982e3719ab \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			42586aa50d84870f12244b6c9acdda982e3719ab \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			42586aa50d84870f12244b6c9acdda982e3719ab \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			42586aa50d84870f12244b6c9acdda982e3719ab \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -124,19 +124,19 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			42586aa50d84870f12244b6c9acdda982e3719ab \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
-			https://github.com/tcrs/crosstool-ng.git \
-			37c98916a5695553aba294c5d810226cb88f3193 \
-			"arm-${1}-linux-gnueabi"
+			https://github.com/NiLuJe/crosstool-ng.git \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			42586aa50d84870f12244b6c9acdda982e3719ab \
+			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
