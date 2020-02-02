@@ -332,6 +332,9 @@ case ${1} in
 	mk7 | Mk7 | MK7 )
 		KINDLE_TC="MK7"
 	;;
+	remarkable | reMarkable | Remarkable)
+		KINDLE_TC="remarkable"
+	;;
 	# Or build them?
 	tc )
 		Build_CT-NG-Legacy
@@ -341,7 +344,7 @@ case ${1} in
 		exit 0
 	;;
 	* )
-		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7 or nickel)"
+		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7, nickel or remarkable)"
 		echo "Or, alternatively, ask to build them (tc)"
 		exit 1
 	;;
