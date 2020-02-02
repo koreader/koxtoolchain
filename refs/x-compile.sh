@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16810 2020-02-02 18:18:35Z NiLuJe $
+# $Id: x-compile.sh 16811 2020-02-02 18:20:07Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -777,7 +777,7 @@ case ${KINDLE_TC} in
 		export CROSS_PREFIX="${CROSS_TC}-"
 		export PATH="${HOME}/x-tools/${CROSS_TC}/bin:${PATH}"
 
-		## NOTE: Upstream is (currently) using GCC 7.3, so have no C++ ABI issue to take care of :)
+		## NOTE: Upstream is (currently) using GCC 7.3, so we have no potential C++ ABI issue to take care of :)
 
 		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
 		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb"
