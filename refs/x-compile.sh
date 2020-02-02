@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16808 2020-02-02 00:38:41Z NiLuJe $
+# $Id: x-compile.sh 16809 2020-02-02 18:16:55Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -114,7 +114,7 @@ Build_CT-NG-Legacy() {
 	unset CFLAGS CXXFLAGS LDFLAGS
 
 	## And then build every TC one after the other...
-	for my_tc in kindle kindle5 kindlepw2 kobo ; do
+	for my_tc in kindle kindle5 kindlepw2 kobo remarkable ; do
 		echo ""
 		echo "* Building the ${my_tc} ToolChain . . ."
 		echo ""
@@ -332,6 +332,9 @@ case ${1} in
 	mk7 | Mk7 | MK7 )
 		KINDLE_TC="MK7"
 	;;
+	remarkable | reMarkable )
+		KINDLE_TC="REMARKABLE"
+	;;
 	# Or build them?
 	tc )
 		Build_CT-NG-Legacy
@@ -341,7 +344,7 @@ case ${1} in
 		exit 0
 	;;
 	* )
-		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7 or nickel)"
+		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7, nickel or remarkable)"
 		echo "Or, alternatively, ask to build them (tc)"
 		exit 1
 	;;
@@ -761,6 +764,68 @@ case ${KINDLE_TC} in
 		# And we'll let dropbear live in the internal memory to avoid any potential interaction with USBMS...
 		DEVICE_INTERNAL_USERSTORE="/usr/local/niluje"
 		DEVICE_USERSTORE="${DEVICE_ONBOARD_USERSTORE}"
+	;;
+	REMARKABLE )
+		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard -mthumb"
+		CROSS_TC="arm-remarkable-linux-gnueabihf"
+		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
+
+		# Export it for our CMakeCross TC file
+		export CROSS_TC
+		export TC_BUILD_DIR
+
+		export CROSS_PREFIX="${CROSS_TC}-"
+		export PATH="${HOME}/x-tools/${CROSS_TC}/bin:${PATH}"
+
+		## NOTE: Upstream is (currently) using GCC 7.3, so have no C++ ABI issue to take care of :)
+
+		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
+		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb"
+		## Here be dragons!
+		RICE_CFLAGS="-O3 -ffast-math -ftree-vectorize -funroll-loops ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
+
+		## NOTE: Check if LTO still horribly breaks some stuff...
+		## NOTE: See https://gcc.gnu.org/gcc-4.9/changes.html for the notes about building LTO-enabled static libraries... (gcc-ar/gcc-ranlib)
+		## NOTE: And see https://gcc.gnu.org/gcc-5/changes.html to rejoice because we don't have to care about broken build-systems with mismatched compile/link time flags anymore :).
+		export AR="${CROSS_TC}-gcc-ar"
+		export RANLIB="${CROSS_TC}-gcc-ranlib"
+		export NM="${CROSS_TC}-gcc-nm"
+		## NOTE: Also, BOLO for packages thant link with $(CC) $(LDFLAGS) (ie. without CFLAGS). This is BAD. One (dirty) workaround if you can't fix the package is to append CFLAGS to the end of LDFLAGS... :/
+		## NOTE: ... although GCC 5 should handle this in a transparent & sane manner, so, yay :).
+		#BASE_CFLAGS="${NOLTO_CFLAGS}"
+		export CFLAGS="${BASE_CFLAGS}"
+		export CXXFLAGS="${BASE_CFLAGS}"
+		# NOTE: Use -isystem instead of -I to make sure GMP doesn't do crazy stuff... (FIXME: -idirafter sounds more correct for our use-case, though...)
+		BASE_CPPFLAGS="-isystem${TC_BUILD_DIR}/include"
+		export CPPFLAGS="${BASE_CPPFLAGS}"
+		BASE_LDFLAGS="-L${TC_BUILD_DIR}/lib -Wl,-O1 -Wl,--as-needed"
+		# NOTE: Dirty LTO workaround (cf. earlier). All hell might break loose if we tweak CFLAGS for some packages...
+		#BASE_LDFLAGS="${BASE_CFLAGS} ${BASE_LDFLAGS}"
+		export LDFLAGS="${BASE_LDFLAGS}"
+
+		# NOTE: We're no longer using the gold linker by default...
+		# FIXME: Because for some mysterious reason, gold + LTO leads to an unconditional dynamic link against libgcc_s (uless -static-libgcc is passed, of course).
+		export CTNG_LD_IS="bfd"
+
+		## NOTE: We jump through terrible hoops to counteract libtool's stripping of 'unknown' or 'harmful' FLAGS... (cf. https://www.gnu.org/software/libtool/manual/html_node/Stripped-link-flags.html)
+		## That's a questionable behavior that is bound to screw up LTO in fun and interesting ways, at the very least on the performance aspect of things...
+		## Store those in the right format here, and apply patches or tricks to anything using libtool, because of course it's a syntax that gcc doesn't know about, so we can't simply put it in the global LDFLAGS.... -_-".
+		## And since autotools being autotools, it's used in various completely idiosyncratic ways, we can't always rely on simply overriding AM_LDFLAGS...
+		## NOTE: Hopefully, GCC 5's smarter LTO handling means we don't have to care about that anymore... :).
+		export XC_LINKTOOL_CFLAGS="-Wc,-ffast-math -Wc,-fomit-frame-pointer -Wc,-frename-registers -Wc,-fweb"
+
+		BASE_HACKDIR="${SVN_ROOT}/Configs/trunk/Kindle/reMarkable_Hacks"
+
+		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
+		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
+		export PKG_CONFIG_DIR=
+		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
+
+		## CMake is hell.
+		export CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPTS_BASE_DIR}/CMakeCross.txt -DCMAKE_INSTALL_PREFIX=${TC_BUILD_DIR}"
+
+		DEVICE_USERSTORE="/home/root"
 	;;
 	* )
 		echo "Unknown TC: ${KINDLE_TC} !"
