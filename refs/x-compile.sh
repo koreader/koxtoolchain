@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16759 2019-12-12 23:09:42Z NiLuJe $
+# $Id: x-compile.sh 16808 2020-02-02 00:38:41Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -332,9 +332,6 @@ case ${1} in
 	mk7 | Mk7 | MK7 )
 		KINDLE_TC="MK7"
 	;;
-	remarkable | reMarkable | Remarkable)
-		KINDLE_TC="remarkable"
-	;;
 	# Or build them?
 	tc )
 		Build_CT-NG-Legacy
@@ -344,7 +341,7 @@ case ${1} in
 		exit 0
 	;;
 	* )
-		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7, nickel or remarkable)"
+		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7 or nickel)"
 		echo "Or, alternatively, ask to build them (tc)"
 		exit 1
 	;;
@@ -1001,9 +998,9 @@ fi
 echo "* Building expat . . ."
 echo ""
 cd ..
-EXPAT_SOVER="1.6.10"
-tar -xvJf /usr/portage/distfiles/expat-2.2.8.tar.xz
-cd expat-2.2.8
+EXPAT_SOVER="1.6.11"
+tar -xvJf /usr/portage/distfiles/expat-2.2.9.tar.xz
+cd expat-2.2.9
 update_title_info
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=yes --without-docbook
 make ${JOBSFLAGS}
@@ -1016,7 +1013,7 @@ Build_FreeType_Stack() {
 	# Funnily enough, it depends on freetype too...
 	# NOTE: I thought I *might* have to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512,
 	#       but in practice in turns out that wasn't needed ;).
-	FT_VER="2.10.1_p20191209"
+	FT_VER="2.10.1_p20200119"
 	FT_SOVER="6.17.1"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
@@ -1222,8 +1219,8 @@ fi
 echo "* Building util-linux . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/util-linux-2.34.tar.xz
-cd util-linux-2.34
+tar -xvJf /usr/portage/distfiles/util-linux-2.35.tar.xz
+cd util-linux-2.35
 update_title_info
 sed -i -E \
 	-e '/NCURSES_/s:(ncursesw?)[56]-config:$PKG_CONFIG \1:' \
@@ -1233,9 +1230,9 @@ libtoolize
 export scanf_cv_alloc_modifier=ms
 # FIXME: bfd insists on libuuid being built PIC...
 if [[ "${CTNG_LD_IS}" == "bfd" ]] ; then
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-makeinstall-chown --disable-makeinstall-setuid --without-python --without-readline --without-slang --without-systemd --without-udev --without-ncursesw --without-ncurses --enable-widechar --without-selinux --without-tinfo --disable-all-programs --disable-bash-completion --without-systemdsystemunitdir --enable-libuuid --disable-libblkid --disable-libsmartcols --disable-libfdisk --disable-libmount --with-pic
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-makeinstall-chown --disable-makeinstall-setuid --without-python --without-readline --without-slang --without-systemd --without-udev --without-ncursesw --without-ncurses --enable-widechar --without-selinux --without-tinfo --disable-all-programs --disable-bash-completion --without-systemdsystemunitdir --enable-libuuid --disable-libblkid --disable-libsmartcols --disable-libfdisk --disable-libmount --without-cryptsetup --with-pic
 else
-	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-makeinstall-chown --disable-makeinstall-setuid --without-python --without-readline --without-slang --without-systemd --without-udev --without-ncursesw --without-ncurses --enable-widechar --without-selinux --without-tinfo --disable-all-programs --disable-bash-completion --without-systemdsystemunitdir --enable-libuuid --disable-libblkid --disable-libsmartcols --disable-libfdisk --disable-libmount
+	./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=no --enable-static=yes --disable-makeinstall-chown --disable-makeinstall-setuid --without-python --without-readline --without-slang --without-systemd --without-udev --without-ncursesw --without-ncurses --enable-widechar --without-selinux --without-tinfo --disable-all-programs --disable-bash-completion --without-systemdsystemunitdir --enable-libuuid --disable-libblkid --disable-libsmartcols --disable-libfdisk --disable-libmount --without-cryptsetup
 fi
 make ${JOBSFLAGS}
 make install
@@ -2218,12 +2215,12 @@ cp shlock ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/shlock
 echo "* Building protobuf . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/protobuf-3.10.1.tar.gz
-cd protobuf-3.10.1
+tar -I pigz -xvf /usr/portage/distfiles/protobuf-3.11.2.tar.gz
+cd protobuf-3.11.2
 update_title_info
-patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.8.0-disable_no-warning-test.patch
-patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.8.0-system_libraries.patch
-patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.8.0-protoc_input_output_files.patch
+patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.11.0-disable_no-warning-test.patch
+patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.11.0-system_libraries.patch
+patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.11.0-protoc_input_output_files.patch
 export CXXFLAGS="${BASE_CFLAGS} -DGOOGLE_PROTOBUF_NO_RTTI"
 autoreconf -fi
 ## NOTE: The host *must* be running the exact same version (for protoc)
@@ -2267,7 +2264,7 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.4.0_p20191206.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.4.1_p20200126.tar.xz
 cd libarchive
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
@@ -2288,8 +2285,8 @@ unset ac_cv_header_ext2fs_ext2_fs_h
 echo "* Building GMP . . ."
 echo ""
 cd ..
-tar xvJf /usr/portage/distfiles/gmp-6.1.2.tar.xz
-cd gmp-6.1.2
+tar xvJf /usr/portage/distfiles/gmp-6.2.0.tar.xz
+cd gmp-6.2.0
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
 patch -p1 < /usr/portage/dev-libs/gmp/files/gmp-6.1.0-noexecstack-detect.patch
@@ -2441,8 +2438,8 @@ echo ""
 cd ..
 LIBJPG_SOVER="62.3.0"
 LIBTJP_SOVER="0.2.0"
-tar -I pigz -xvf /usr/portage/distfiles/libjpeg-turbo-2.0.3.tar.gz
-cd libjpeg-turbo-2.0.3
+tar -I pigz -xvf /usr/portage/distfiles/libjpeg-turbo-2.0.4.tar.gz
+cd libjpeg-turbo-2.0.4
 update_title_info
 # Oh, CMake (https://gitlab.kitware.com/cmake/cmake/issues/12928) ...
 export CFLAGS="${BASE_CPPFLAGS} ${RICE_CFLAGS}"
@@ -2470,8 +2467,8 @@ IM_SOVER="6.0.0"
 cd ..
 # FWIW, you can pretty much use the same configure line for GraphicsMagick, although the ScreenSavers hack won't work with it.
 # It doesn't appear to need the quantize patch though, it consumes a 'normal' amount of memory by default.
-tar xvJf /usr/portage/distfiles/ImageMagick-6.9.10-77.tar.xz
-cd ImageMagick-6.9.10-77
+tar xvJf /usr/portage/distfiles/ImageMagick-6.9.10-84.tar.xz
+cd ImageMagick-6.9.10-84
 update_title_info
 # NOTE: Revert this until I figure out exactly how/why it's breaking some of my Distort Resize w/ Lab -> sRGB CSC on some PNG input...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/im-v6-revert-issue1694-77.diff
@@ -2656,9 +2653,9 @@ export CPPFLAGS="${BASE_CPPFLAGS}"
 echo "* Building SQLite3 . . ."
 echo ""
 SQLITE_SOVER="0.8.6"
-SQLITE_VER="3300100"
+SQLITE_VER="3310100"
 cd ..
-wget https://sqlite.org/2019/sqlite-src-${SQLITE_VER}.zip -O sqlite-src-${SQLITE_VER}.zip
+wget https://sqlite.org/2020/sqlite-src-${SQLITE_VER}.zip -O sqlite-src-${SQLITE_VER}.zip
 unzip sqlite-src-${SQLITE_VER}.zip
 cd sqlite-src-${SQLITE_VER}
 update_title_info
@@ -2776,6 +2773,7 @@ done
 patch -p1 < /usr/portage/dev-libs/libxml2/files/libxml2-2.7.1-catalog_path.patch
 patch -p1 < /usr/portage/dev-libs/libxml2/files/libxml2-2.9.2-python-ABIFLAG.patch
 patch -p1 < /usr/portage/dev-libs/libxml2/files/libxml2-2.9.8-out-of-tree-test.patch
+patch -p1 < /usr/portage/dev-libs/libxml2/files/2.9.9-python3-unicode-errors.patch
 autoreconf -fi
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/python3/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
 if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
@@ -2809,6 +2807,7 @@ export LDFLAGS="${BASE_LDFLAGS}"
 
 ## Python for ScreenSavers
 PYTHON_CUR_VER="2.7.17"
+PYTHON2_PATCH_REV="2.7.17-r1"
 echo "* Building Python . . ."
 echo ""
 cd ..
@@ -2818,10 +2817,9 @@ update_title_info
 rm -fr Modules/expat
 rm -fr Modules/_ctypes/libffi*
 rm -fr Modules/zlib
-tar xvJf /usr/portage/distfiles/python-gentoo-patches-${PYTHON_CUR_VER}.tar.xz
-# NOTE: The ebuild blacklists '*_regenerate_platform-specific_modules.patch' when cross-compiling, which is a good idea in case the host's python version doesn't match...
-rm patches/0006-Regenerate-platform-specific-modules.patch
-for patchfile in patches/* ; do
+# Gentoo Patches...
+tar xvJf /usr/portage/distfiles/python-gentoo-patches-${PYTHON2_PATCH_REV}.tar.xz
+for patchfile in python-gentoo-patches-${PYTHON2_PATCH_REV}/* ; do
 	# Try to detect if we need p0 or p1...
 	if grep -q 'diff --git' "${patchfile}" ; then
 		echo "Applying ${patchfile} w/ p1 . . ."
@@ -2831,11 +2829,6 @@ for patchfile in patches/* ; do
 		patch -p0 < ${patchfile}
 	fi
 done
-# Gentoo Patches...
-patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.5-nonfatal-compileall.patch
-patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.9-ncurses-pkg-config.patch
-patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.10-cross-compile-warn-test.patch
-patch -p1 < /usr/portage/dev-lang/python/files/python-2.7.10-system-libffi.patch
 # Adapted from Gentoo's 2.7.3 cross-compile patchset. There's some fairly ugly and unportable hacks in there, because for the life of me I can't figure out how the cross-compile support merged in 2.7.4 is supposed to take care of some stuff... (namely, pgen & install)
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/python-2.7.15-cross-compile.patch
 # LTO makefile compat...
@@ -2855,7 +2848,8 @@ autoreconf -fi
 
 # Note that curses needs ncursesw, which doesn't ship on every Kindle, so we ship our own. Same deal for readline.
 export PYTHON_DISABLE_MODULES="dbm _bsddb gdbm _tkinter"
-export CFLAGS="${BASE_CFLAGS} -fwrapv"
+# c.f., https://fedoraproject.org/wiki/Changes/PythonNoSemanticInterpositionSpeedup
+export CFLAGS="${BASE_CFLAGS} -fwrapv -fno-semantic-interposition"
 # Apparently, we need -I here, or Python cannot find any our our stuff...
 export CPPFLAGS="${BASE_CPPFLAGS/-isystem/-I}"
 
@@ -2948,8 +2942,8 @@ export CFLAGS="${BASE_CFLAGS}"
 unset PYTHON_DISABLE_MODULES
 
 ## Python 3
-PYTHON3_CUR_VER="3.7.5"
-PYTHON3_PATCH_REV="3.7.4-1"
+PYTHON3_CUR_VER="3.7.6"
+PYTHON3_PATCH_REV="3.7.6"
 echo "* Building Python 3 . . ."
 echo ""
 cd ..
@@ -2960,9 +2954,8 @@ rm -fr Modules/expat
 rm -fr Modules/_ctypes/libffi*
 rm -fr Modules/zlib
 # Gentoo Patches...
-patch -p1 < /usr/portage/dev-lang/python/files/python-3.7.5-hashlib.patch
 tar xvJf /usr/portage/distfiles/python-gentoo-patches-${PYTHON3_PATCH_REV}.tar.xz
-for patchfile in patches/* ; do
+for patchfile in python-gentoo-patches-${PYTHON3_PATCH_REV}/* ; do
 	# Try to detect if we need p0 or p1...
 	if grep -q 'diff --git' "${patchfile}" ; then
 		echo "Applying ${patchfile} w/ p1 . . ."
@@ -2979,7 +2972,8 @@ autoreconf -fi
 
 # Note that curses needs ncursesw, which doesn't ship on every Kindle, so we ship our own. Same deal for readline.
 export PYTHON_DISABLE_MODULES="gdbm _tkinter"
-export CFLAGS="${BASE_CFLAGS} -fwrapv"
+# c.f., https://fedoraproject.org/wiki/Changes/PythonNoSemanticInterpositionSpeedup
+export CFLAGS="${BASE_CFLAGS} -fwrapv -fno-semantic-interposition"
 # Apparently, we need -I here, or Python cannot find any our our stuff when building modules...
 # And the ncursesw stuff is also needed for cross-builds...
 export CPPFLAGS="${BASE_CPPFLAGS} -I${TC_BUILD_DIR}/include -I${TC_BUILD_DIR}/include/ncursesw"
@@ -3924,6 +3918,7 @@ cd ..
 tar xvJf /usr/portage/distfiles/glib-2.60.7.tar.xz
 cd glib-2.60.7
 update_title_info
+patch -p1 < /usr/portage/dev-libs/glib/files/2.60.7-gdbus-fixes.patch
 #tar xvJf /usr/portage/distfiles/glib-2.58.1-patchset.tar.xz
 for patchfile in patches/*.patch ; do
 	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
@@ -3974,8 +3969,8 @@ export CXXFLAGS="${BASE_CFLAGS}"
 echo "* Building fuse . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/fuse-3.8.0.tar.xz
-cd fuse-3.8.0
+tar -xvJf /usr/portage/distfiles/fuse-3.9.0.tar.xz
+cd fuse-3.9.0
 update_title_info
 
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
@@ -4454,11 +4449,9 @@ fi
 echo "* Building file . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/file-5.37.tar.gz
-cd file-5.37
+tar -I pigz -xvf /usr/portage/distfiles/file-5.38.tar.gz
+cd file-5.38
 update_title_info
-# Gentoo patches
-patch -p1 < /usr/portage/sys-apps/file/files/file-5.37-CVE-2019-18218.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/file-fix-Makefile-for-lto.patch
 autoreconf -fi
@@ -4470,7 +4463,7 @@ export ac_cv_lib_z_gzopen=yes
 # Make sure libtool doesn't eat any our of our CFLAGS when linking...
 export AM_LDFLAGS="${XC_LINKTOOL_CFLAGS}"
 # NOTE: We can't do much regarding Kobo's broken widechar support. Building with --disable-utf8 is not a viable solution.
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-libseccomp --enable-fsect-man5 --with-zlib --datarootdir="${DEVICE_USERSTORE}/usbnet/share"
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-libseccomp --enable-fsect-man5 --disable-bzlib --disable-xzlib --with-zlib --datarootdir="${DEVICE_USERSTORE}/usbnet/share"
 make ${JOBSFLAGS} V=1
 make install
 unset AM_LDFLAGS
@@ -4487,8 +4480,8 @@ cp -f ${DEVICE_USERSTORE}/usbnet/share/misc/magic.mgc ${BASE_HACKDIR}/USBNetwork
 echo "* Building nano . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/nano-4.6.tar.gz
-cd nano-4.6
+tar -I pigz -xvf /usr/portage/distfiles/nano-4.7.tar.gz
+cd nano-4.7
 update_title_info
 # NOTE: On Kindles, we hit a number of dumb collation issues with regexes needed for syntax highlighting on some locales (notably en_GB...) on some FW versions, so enforce en_US...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/nano-kindle-locale-hack.patch
@@ -4691,7 +4684,8 @@ update_title_info
 for patchfile in patch/*.patch ; do
 	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
 done
-#patch -p1 < /usr/portage/sys-devel/gdb/files/gdb-8.2-tinfow.patch
+patch -p1 < /usr/portage/sys-devel/gdb/files/gdb-8.3.1-verbose-build.patch
+patch -p1 < /usr/portage/sys-devel/gdb/files/gdb-8.3.1-gcc-10.patch
 # NOTE: Workaround weird-ass error: 'log2' is not a member of 'std' when using the K3/K5/PW2 TC...
 if [[ "${KINDLE_TC}" == "K3" ]] || [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] ; then
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/gdb-8.2-k3-log2-fix.patch
@@ -4724,8 +4718,8 @@ echo ""
 cd ..
 rm -rf binutils
 # NOTE: Use a GH mirror, because there's over 300MB of sources, and the sourceware master isn't always in tip top shape...
-#until git clone -b binutils-2_33-branch --single-branch --depth 1 git://sourceware.org/git/binutils-gdb.git binutils ; do
-until git clone -b binutils-2_33-branch --single-branch --depth 1 https://github.com/bminor/binutils-gdb.git binutils ; do
+#until git clone -b binutils-2_34-branch --single-branch --depth 1 git://sourceware.org/git/binutils-gdb.git binutils ; do
+until git clone -b binutils-2_34-branch --single-branch --depth 1 https://github.com/bminor/binutils-gdb.git binutils ; do
 	rm -rf binutils
 	sleep 15
 done
@@ -4751,8 +4745,8 @@ CURL_SOVER="4.6.0"
 echo "* Building cURL . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/curl-7.67.0.tar.xz
-cd curl-7.67.0
+tar -xvJf /usr/portage/distfiles/curl-7.68.0.tar.xz
+cd curl-7.68.0
 update_title_info
 # Gentoo patches
 patch -p1 < /usr/portage/net-misc/curl/files/curl-7.30.0-prefix.patch
@@ -4767,7 +4761,7 @@ cp lib/ca-bundle.crt ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/ca-bundle.crt
 # Setup our rpath...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 # NOTE: esni isn't in mainline OpenSSL (https://bugs.gentoo.org/699648)
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --without-gnutls --without-mbedtls --without-nss --without-polarssl --without-winssl --with-ca-fallback --with-ca-bundle=${DEVICE_USERSTORE}/usbnet/lib/ca-bundle.crt --with-ssl --with-ca-path=/etc/ssl/certs --disable-alt-svc --enable-crypto-auth --enable-dict --disable-esni --enable-file --enable-ftp --enable-gopher --enable-http --enable-imap --disable-ldap --disable-ldaps --disable-ntlm-wb --enable-pop3 --enable-rt --enable-rtsp --disable-smb --without-libssh2 --enable-smtp --enable-telnet -enable-tftp --enable-tls-srp --disable-ares --enable-cookies --enable-dateparse --enable-dnsshuffle --enable-doh --enable-hidden-symbols --enable-http-auth --disable-ipv6 --enable-largefile --without-libpsl --enable-manual --enable-mime --enable-netrc --enable-progress-meter --enable-proxy --disable-sspi --enable-threaded-resolver --enable-pthreads --disable-versioned-symbols --without-amissl --without-cyassl --without-darwinssl --without-fish-functions-dir --without-libidn2 --without-gssapi --without-libmetalink --without-nghttp2 --without-librtmp --without-brotli --without-schannel --without-secure-transport --without-spnego --without-winidn --without-wolfssl --with-zlib
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --without-gnutls --without-mbedtls --without-nss --without-polarssl --without-winssl --with-ca-fallback --with-ca-bundle=${DEVICE_USERSTORE}/usbnet/lib/ca-bundle.crt --with-ssl --with-ca-path=/etc/ssl/certs --disable-alt-svc --enable-crypto-auth --enable-dict --disable-esni --enable-file --enable-ftp --enable-gopher --enable-http --enable-imap --disable-ldap --disable-ldaps --disable-ntlm-wb --enable-pop3 --enable-rt --enable-rtsp --disable-smb --without-libssh2 --enable-smtp --enable-telnet -enable-tftp --enable-tls-srp --disable-ares --enable-cookies --enable-dateparse --enable-dnsshuffle --enable-doh --enable-hidden-symbols --enable-http-auth --disable-ipv6 --enable-largefile --without-libpsl --enable-manual --enable-mime --enable-netrc --enable-progress-meter --enable-proxy --disable-sspi --enable-threaded-resolver --enable-pthreads --disable-versioned-symbols --without-amissl --without-bearssl --without-cyassl --without-darwinssl --without-fish-functions-dir --without-libidn2 --without-gssapi --without-libmetalink --without-nghttp2 --without-librtmp --without-brotli --without-schannel --without-secure-transport --without-spnego --without-winidn --without-wolfssl --with-zlib
 make ${JOBSFLAGS} V=1
 make install
 ${CROSS_TC}-strip --strip-unneeded ../bin/curl
