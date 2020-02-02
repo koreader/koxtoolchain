@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16809 2020-02-02 18:16:55Z NiLuJe $
+# $Id: x-compile.sh 16810 2020-02-02 18:18:35Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -332,7 +332,7 @@ case ${1} in
 	mk7 | Mk7 | MK7 )
 		KINDLE_TC="MK7"
 	;;
-	remarkable | reMarkable )
+	remarkable | reMarkable | Remarkable )
 		KINDLE_TC="REMARKABLE"
 	;;
 	# Or build them?
