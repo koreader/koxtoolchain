@@ -81,6 +81,7 @@ Supported platforms:
 	nickel
 	remarkable
 	cervantes
+	pocketbook
 "
 
 if [ $# -lt 1 ]; then
@@ -98,25 +99,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -124,20 +125,27 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
 			"arm-${1}-linux-gnueabi"
+		;;
+	pocketbook)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			57e124db8d57ed58827f4acaedf097f4be67c82f \
+			"arm-${1}-linux-gnueabi"
+		# Then, pull InkView from the official SDK...
 		;;
 	*)
 		echo "[!] $1 not supported!"
