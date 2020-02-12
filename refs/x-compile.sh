@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16861 2020-02-12 00:15:00Z NiLuJe $
+# $Id: x-compile.sh 16865 2020-02-12 04:23:24Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -825,6 +825,8 @@ case ${KINDLE_TC} in
 		DEVICE_USERSTORE="/home/root"
 	;;
 	PB )
+		# NOTE: The TC itself is built in ARM mode, otherwise glibc 2.9 doesn't build (fails with a "r15 not allowed here" assembler error on csu/libc-start.o during the early multilib start-files step).
+		#       AFAICT, the official SDK doesn't make a specific choice on that front (i.e., it passes neither -marm not -mthumb)...
 		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp -mthumb"
 		CROSS_TC="arm-pocketbook-linux-gnueabi"
 		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
