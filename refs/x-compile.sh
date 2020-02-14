@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16865 2020-02-12 04:23:24Z NiLuJe $
+# $Id: x-compile.sh 16866 2020-02-14 06:04:40Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -2094,19 +2094,20 @@ echo "* Building ncurses (narrowc) . . ."
 echo ""
 NCURSES_SOVER="6.1"
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.1.tar.gz
-cd ncurses-6.1
+tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.2.tar.gz
+cd ncurses-6.2
 update_title_info
 export CFLAGS="${BASE_CFLAGS}"
 export CXXFLAGS="${BASE_CFLAGS}"
-bzcat /usr/portage/distfiles/ncurses-6.1-20190609-patch.sh.bz2 > ncurses-6.1-20190609-patch.sh
-sh ncurses-6.1-20190609-patch.sh
+#bzcat /usr/portage/distfiles/ncurses-6.1-20190609-patch.sh.bz2 > ncurses-6.1-20190609-patch.sh
+#sh ncurses-6.1-20190609-patch.sh
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.7-nongnu.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-rxvt-unicode-9.15.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-pkg-config.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.9-gcc-5.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-ticlib.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-cppflags-cross.patch
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.2-no_user_ldflags_in_libs.patch
 unset TERMINFO
 export CPPFLAGS="${BASE_CPPFLAGS} -D_GNU_SOURCE"
 # NOTE: cross-compile fun times, build tic for our host, in case we're not running the same ncurses version...
@@ -4023,8 +4024,8 @@ cp ../bin/inotifywait ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/inotifywait
 echo "* Building libpcre . . ."
 echo ""
 cd ..
-tar -I lbzip2 -xvf /usr/portage/distfiles/pcre-8.43.tar.bz2
-cd pcre-8.43
+tar -I lbzip2 -xvf /usr/portage/distfiles/pcre-8.44.tar.bz2
+cd pcre-8.44
 update_title_info
 sed -e "s:-lpcre ::" -i libpcrecpp.pc.in
 patch -p1 < /usr/portage/dev-libs/libpcre/files/libpcre-8.41-fix-stack-size-detection.patch
