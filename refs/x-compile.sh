@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16866 2020-02-14 06:04:40Z NiLuJe $
+# $Id: x-compile.sh 16867 2020-02-14 16:46:00Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -838,7 +838,8 @@ case ${KINDLE_TC} in
 		export CROSS_PREFIX="${CROSS_TC}-"
 		export PATH="${HOME}/x-tools/${CROSS_TC}/bin:${PATH}"
 
-		## NOTE: The new libstdc++ ABI might cause some issues if not handled on GCC >= 5.1 (cf. https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html), so, disable it...
+		## NOTE: The new libstdc++ ABI might cause some issues if not handled on GCC >= 5.1 (c.f., https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html), so, disable it...
+		## NOTE: This is a bit annoying on PB, because older FW were based on GCC 4.8.1 (so, old ABI), but newer FW (5.19+) are based on GCC 6.3.0 + Clang 7 (so, new ABI, not libc++) :/.
 		if is_ver_gte "$(${CROSS_TC}-gcc -dumpversion)" "5.1" ; then
 			LEGACY_GLIBCXX_ABI="-D_GLIBCXX_USE_CXX11_ABI=0"
 			## NOTE: Like the FORTIFY stuff, this should *really* be in CPPFLAGS, but we have to contend with broken buildsystems that don't honor CPPFLAGS... So we go with the more ubiquitous CFLAGS instead ;/.
