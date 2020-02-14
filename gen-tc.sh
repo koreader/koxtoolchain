@@ -145,7 +145,8 @@ case $1 in
 			https://github.com/NiLuJe/crosstool-ng.git \
 			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabi"
-		# Then, pull InkView from the official SDK...
+		# Then, pull InkView from the (old) official SDK...
+		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
 		chmod a+w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib"
 		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/lib/libinkview.481.5.17.so \
 			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libinkview.so"
