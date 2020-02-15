@@ -81,6 +81,7 @@ Supported platforms:
 	nickel
 	remarkable
 	cervantes
+	pocketbook
 "
 
 if [ $# -lt 1 ]; then
@@ -98,25 +99,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -124,20 +125,63 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a0312e4adca73bb13e00f6b83fac73a9d3752fef \
+			62346205740bfbbc0858fea404702b731daffe90 \
 			"arm-${1}-linux-gnueabi"
+		;;
+	pocketbook)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			62346205740bfbbc0858fea404702b731daffe90 \
+			"arm-${1}-linux-gnueabi"
+		# Then, pull InkView from the (old) official SDK...
+		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
+		chmod a+w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/lib/libinkview.481.5.17.so \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libinkview.so"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libinkview.so"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/lib/libhwconfig.so \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libhwconfig.so"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libhwconfig.so"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/FRSCSDK/arm-none-linux-gnueabi/sysroot/usr/lib/libbookstate.so \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libbookstate.so"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib/libbookstate.so"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/lib"
+		chmod a+w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/include/inkview.h \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkview.h"
+		# Don't pull 3rd-party includes...
+		sed -e '/^#include <zlib.h>/i \/*' -i "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkview.h"
+		sed -e '/^#include FT_OUTLINE_H/a *\/' -i "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkview.h"
+		# NOTE: This also comments <pthread.h>, which the header itself doesn't need anyway...
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkview.h"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/include/inkplatform.h \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkplatform.h"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkplatform.h"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/include/inklog.h \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inklog.h"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inklog.h"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/include/inkinternal.h \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkinternal.h"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/inkinternal.h"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/SDK_481/arm-obreey-linux-gnueabi/sysroot/usr/local/include/hwconfig.h \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/hwconfig.h"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/hwconfig.h"
+		wget https://github.com/blchinezu/pocketbook-sdk/raw/5.17/FRSCSDK/arm-none-linux-gnueabi/sysroot/usr/include/bookstate.h \
+			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
+		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include"
 		;;
 	*)
 		echo "[!] $1 not supported!"
