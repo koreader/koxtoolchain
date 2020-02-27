@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16867 2020-02-14 16:46:00Z NiLuJe $
+# $Id: x-compile.sh 16906 2020-02-27 06:06:05Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -393,7 +393,7 @@ esac
 # To fetch everything:
 #	cave resolve -1 -z -f -x sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb --uninstalls-may-break '*/*'
 #	OR
-#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python:3.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb libxml2 libxslt
+#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python:3.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb libxml2 libxslt pax-utils
 #
 ##
 
@@ -1144,7 +1144,7 @@ Build_FreeType_Stack() {
 	# Funnily enough, it depends on freetype too...
 	# NOTE: I thought I *might* have to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512,
 	#       but in practice in turns out that wasn't needed ;).
-	FT_VER="2.10.1_p20200204"
+	FT_VER="2.10.1_p20200216"
 	FT_SOVER="6.17.1"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
@@ -1373,7 +1373,7 @@ unset scanf_cv_alloc_modifier
 echo "* Building fontconfig . . ."
 echo ""
 FC_SOVER="1.12.0"
-FC_VER="2.13.91_p20191209"
+FC_VER="2.13.91_p20200219"
 cd ..
 tar -xvJf /usr/portage/distfiles/fontconfig-${FC_VER}.tar.xz
 cd fontconfig
@@ -1967,7 +1967,7 @@ unset DEFAULT_CFLAGS
 echo "* Building OpenSSH . . ."
 echo ""
 cd ..
-OPENSSH_VERSION="8.1p1"
+OPENSSH_VERSION="8.2p1"
 tar -I pigz -xvf /usr/portage/distfiles/openssh-${OPENSSH_VERSION}.tar.gz
 cd openssh-${OPENSSH_VERSION}
 update_title_info
@@ -1990,19 +1990,20 @@ export ac_cv_path_AR=${CROSS_TC}-gcc-ar
 sed -i -e '/_PATH_XAUTH/s:/usr/X11R6/bin/xauth:/usr/bin/xauth:' pathnames.h
 sed -i '/^AuthorizedKeysFile/s:^:#:' sshd_config
 patch -p1 < /usr/portage/net-misc/openssh/files/openssh-7.9_p1-include-stdlib.patch
-patch -p1 < /usr/portage/net-misc/openssh/files/openssh-8.1_p1-GSSAPI-dns.patch
+patch -p1 < /usr/portage/net-misc/openssh/files/openssh-8.2_p1-GSSAPI-dns.patch
 patch -p1 < /usr/portage/net-misc/openssh/files/openssh-6.7_p1-openssl-ignore-status.patch
 patch -p1 < /usr/portage/net-misc/openssh/files/openssh-7.5_p1-disable-conch-interop-tests.patch
 patch -p1 < /usr/portage/net-misc/openssh/files/openssh-8.0_p1-fix-putty-tests.patch
+patch -p1 < /usr/portage/net-misc/openssh/files/openssh-8.0_p1-deny-shmget-shmat-shmdt-in-preauth-privsep-child.patch
 for patchfile in patch/*.patch ; do
 	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
 done
 # Pubkeys in ${DEVICE_USERSTORE}/usbnet/etc/authorized_keys & with perms checks curbed a bit
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-${OPENSSH_VERSION}-kindle-pubkey-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-8.2p1-kindle-pubkey-hack.patch
 # Curb some more permission checks to avoid dying horribly on FW >= 5.3.9...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-${OPENSSH_VERSION}-kindle-perm-hack.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-8.2p1-kindle-perm-hack.patch
 # Fix Makefile to actually make use of LTO ;).
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-8.1p1-fix-Makefile-for-lto.patch
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/openssh-8.2p1-fix-Makefile-for-lto.patch
 sed -i -e "s:-lcrypto:$(pkg-config --libs ../lib/pkgconfig/openssl.pc):" configure{,.ac}
 sed -i -e 's:^PATH=/:#PATH=/:' configure{,.ac}
 # Tweak a whole lot of paths to suit our needs...
@@ -2334,7 +2335,7 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.4.1_p20200207.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.4.2_p20200213.tar.xz
 cd libarchive
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
@@ -2344,7 +2345,7 @@ sed -e 's/-Werror //' -i ./Makefile.am
 export ac_cv_header_ext2fs_ext2_fs_h=0
 # We now ship our own shared zlib, so let's use it
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --disable-xattr --disable-acl --with-zlib --without-bz2lib --without-lzmadec --without-iconv --without-lzma --without-nettle --without-openssl --without-expat --without-xml2 --without-lz4
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --disable-xattr --disable-acl --with-zlib --without-libb2 --without-bz2lib --without-lzmadec --without-iconv --without-lzma --without-nettle --without-openssl --without-expat --without-xml2 --without-lz4 --without-zstd
 make ${JOBSFLAGS} V=1
 make install
 export CFLAGS="${BASE_CFLAGS}"
@@ -2626,6 +2627,7 @@ if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	patch -p1 < /usr/portage/dev-libs/icu/files/icu-65.1-remove-bashisms.patch
 	patch -p1 < /usr/portage/dev-libs/icu/files/icu-64.2-darwin.patch
 	patch -p1 < /usr/portage/dev-libs/icu/files/icu-64.1-data_archive_generation.patch
+	patch -p1 < /usr/portage/dev-libs/icu/files/icu-65.1-integer-overflow.patch
 	# FIXME: Once again a weird cmath issue, like gdb...
 	if [[ "${KINDLE_TC}" != "KOBO" ]] ; then
 		patch -p2 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/icu-62.1-kindle-round-fix.patch
@@ -3011,7 +3013,7 @@ export CFLAGS="${BASE_CFLAGS}"
 unset PYTHON_DISABLE_MODULES
 
 ## Python 3
-PYTHON3_CUR_VER="3.8.1"
+PYTHON3_CUR_VER="3.8.2"
 PYTHON3_PATCH_REV="3.8.1-r2"
 echo "* Building Python 3 . . ."
 echo ""
@@ -3800,6 +3802,25 @@ for py_ver in ${PYTHON_VERSIONS} ; do
 	python${py_ver} setup.py install --root=${TC_BUILD_DIR}/${py_home} --prefix=. --install-lib=lib/python${py_ver}/site-packages --no-compile
 done
 cd ..
+## pyelftools
+rm -rf pyelftools
+until git clone --depth 1 https://github.com/eliben/pyelftools.git ; do
+	rm -rf pyelftools
+	sleep 15
+done
+cd pyelftools
+update_title_info
+for py_ver in ${PYTHON_VERSIONS} ; do
+	if [[ "${py_ver}" == 3.* ]] ; then
+		py_home="python3"
+	else
+		py_home="python"
+	fi
+
+	python${py_ver} setup.py clean --all
+	python${py_ver} setup.py install --root=${TC_BUILD_DIR}/${py_home} --prefix=. --install-lib=lib/python${py_ver}/site-packages --no-compile
+done
+cd ..
 
 for py_ver in ${PYTHON_CUR_VER} ${PYTHON3_CUR_VER} ; do
 	if [[ "${py_ver}" == 3.* ]] ; then
@@ -4051,10 +4072,9 @@ ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/lib
 echo "* Building glib . . ."
 echo ""
 cd ..
-tar xvJf /usr/portage/distfiles/glib-2.60.7.tar.xz
-cd glib-2.60.7
+tar xvJf /usr/portage/distfiles/glib-2.62.5.tar.xz
+cd glib-2.62.5
 update_title_info
-patch -p1 < /usr/portage/dev-libs/glib/files/2.60.7-gdbus-fixes.patch
 #tar xvJf /usr/portage/distfiles/glib-2.58.1-patchset.tar.xz
 for patchfile in patches/*.patch ; do
 	[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
@@ -4095,7 +4115,7 @@ unset my_meson_props
 #       This is extremely stupid. Deal with that nonsense.
 #       According to https://mesonbuild.com/Running-Meson.html#environment-variables,
 #       The idea appears to be that the env should only apply to the native TC. Which is... weird, and extremely counter-intuitive, but, okay...
-env -u CPPFLAGS -u CFLAGS -u CXXFLAGS -u LDFLAGS meson . builddir --cross-file MesonCross.txt --buildtype plain -Ddefault_library=static -Dselinux=disabled -Dxattr=false -Dlibmount=false -Dinternal_pcre=false -Dman=false -Ddtrace=false -Dsystemtap=false -Dgtk_doc=false -Dfam=false -Dinstalled_tests=false -Dnls=enabled
+env -u CPPFLAGS -u CFLAGS -u CXXFLAGS -u LDFLAGS meson . builddir --cross-file MesonCross.txt --buildtype plain -Ddefault_library=static -Dselinux=disabled -Dxattr=false -Dlibmount=false -Dinternal_pcre=false -Dman=false -Ddtrace=false -Dsystemtap=false -Dgtk_doc=false -Dfam=false -Dinstalled_tests=false -Dnls=enabled -Doss_fuzz=disabled
 ninja -v -C builddir
 ninja -v -C builddir install
 export CFLAGS="${BASE_CFLAGS}"
@@ -4133,8 +4153,8 @@ fi
 # NOTE: Random mildly related comment re: building modules. Reading https://github.com/marek-g/kobo-kernel-2.6.35.3-marek/blob/linux/build_instructions is a good start.
 #       In practice, on the old H2O kernel, I've also had to:
 #         * Clear LDFLAGS to prevent them from being picked up by something and and borking it. In the end, I ended up clearing CPPFLAGS/CFLAGS/CXXFLAGS, too, just to be on the safe side.
-#         * Fix scripts/kconfig/lxdialog/check-lxdialog.sh to link against libtinfow (i.e., add -ltinfow to the -l${lib} string), too (similar to what I had to do in ct-ng 1.23), in order to be able to run menuconfig and enable FUSE.
-#         * Kill the final defined() call in kernel/timeconst.pl, as per the warning, to get the main kernel to build.
+#         * Fix scripts/kconfig/lxdialog/check-lxdialog.sh to link against libtinfow (i.e., append -ltinfow to the -l${lib} string), too (similar to what I had to do in ct-ng 1.23), in order to be able to run menuconfig and enable FUSE.
+#         * Kill the final defined() call in kernel/timeconst.pl, as per the warning, to get the main kernel to build. (or backport https://github.com/torvalds/linux/commit/70730bca1331fc50c3caacaea00439de1325bd6e).
 #         * Because of CONFIG_MODVERSIONS, you need a full kernel build first, otherwise init_module throws a fit (ENOEXEC, invalid module format). So you can't just make modules && make modules_install :/.
 #       The H2O kernel appears to have been built with truly ancient MG/CodeSourcery (2010q1-202) GCC 4.4.1 TCs, so I went with my bare 'nickel' GCC 4.9 TC to stay as close as that as possible. That worked out fine.
 #       On that note, fun fact: On Mk. 7, while the rootfs is indeed built with Linaro GCC 4.9-2017.01, the kernel appears to be built w/ GCC 5.3.0...
@@ -4646,7 +4666,7 @@ cp -f ../share/nano/*.nanorc ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/nano/
 ## ZSH itself
 echo "* Building ZSH . . ."
 echo ""
-ZSH_VER="5.7.1"
+ZSH_VER="5.8"
 cd ..
 tar -xvJf /usr/portage/distfiles/zsh-${ZSH_VER}.tar.xz
 cd zsh-${ZSH_VER}
@@ -4736,6 +4756,26 @@ export CFLAGS="${BASE_CFLAGS}"
 # And send that to our common pool of binaries...
 cp ../bin/xzdec ${BASE_HACKDIR}/Common/bin/xzdec
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Common/bin/xzdec
+
+## ZSTD (Which we might end up using, because it's ridiculously faster at decompression. Compression is generally a tad slower and a tad less efficient at -19, though).
+echo "* Building zstd . . ."
+echo ""
+cd ..
+rm -rf zstd
+until git clone -b master --single-branch --depth 1 https://github.com/facebook/zstd.git zstd ; do
+	rm -rf zstd
+	sleep 15
+done
+cd zstd
+update_title_info
+# Fix pthread detection
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zstd-1.4.4-fix-threading-detection.patch
+cd programs
+make -j8 CC="${CROSS_TC}-gcc" CXX="${CROSS_TC}-g++" AR="${CROSS_TC}-gcc-ar" zstd-decompress
+# And send that to our common pool of binaries...
+cp zstd-decompress ${BASE_HACKDIR}/Common/bin/zstd-decompress
+${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Common/bin/zstd-decompress
+cd ..
 
 ## AG (because it's awesome)
 echo "* Building the silver searcher . . ."
@@ -4832,9 +4872,9 @@ export CXXFLAGS="${BASE_CPPFLAGS} ${BASE_CFLAGS}"
 # NOTE: source highlight is incompatible with -static-libstdc++
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	# Avoid pulling in open64_2 (LFS)
-	${TC_BUILD_DIR}/gdb-${GDB_VERSION}/configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-werror --disable-{binutils,etc,gas,gold,gprof,ld} --enable-gdbserver --disable-64-bit-bfd --disable-install-libbfd --disable-install-libiberty --without-guile --disable-readline --with-system-readline --without-zlib --with-system-zlib --with-expat --without-lzma --enable-nls --without-python --disable-largefile --disable-source-highlight
+	${TC_BUILD_DIR}/gdb-${GDB_VERSION}/configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-werror --disable-{binutils,etc,gas,gold,gprof,ld} --enable-gdbserver --disable-64-bit-bfd --disable-install-libbfd --disable-install-libiberty --without-guile --disable-readline --with-system-readline --without-zlib --with-system-zlib --with-expat --without-lzma --enable-nls --without-python --without-xxhash --disable-largefile --disable-source-highlight
 else
-	${TC_BUILD_DIR}/gdb-${GDB_VERSION}/configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-werror --disable-{binutils,etc,gas,gold,gprof,ld} --enable-gdbserver --enable-64-bit-bfd --disable-install-libbfd --disable-install-libiberty --without-guile --disable-readline --with-system-readline --without-zlib --with-system-zlib --with-expat --without-lzma --enable-nls --without-python --disable-source-highlight
+	${TC_BUILD_DIR}/gdb-${GDB_VERSION}/configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-werror --disable-{binutils,etc,gas,gold,gprof,ld} --enable-gdbserver --enable-64-bit-bfd --disable-install-libbfd --disable-install-libiberty --without-guile --disable-readline --with-system-readline --without-zlib --with-system-zlib --with-expat --without-lzma --enable-nls --without-python --without-xxhash --disable-source-highlight
 fi
 make ${JOBSFLAGS} V=1
 make install
@@ -4966,6 +5006,24 @@ done
 cp ../lib/libevemu.so.${EVEMU_SOVER} ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libevemu.so.${EVEMU_SOVER%%.*}
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libevemu.so.${EVEMU_SOVER%%.*}
 export LDFLAGS="${BASE_LDFLAGS}"
+
+## pax-utils (lddtree & friends)
+echo "* Building pax-utils . . ."
+echo ""
+cd ..
+tar -xvJf /usr/portage/distfiles/pax-utils-1.2.5.tar.xz
+cd pax-utils-1.2.5
+update_title_info
+# NOTE: We don't have bash, but we do have ZSH ;).
+sed -e 's%^#!/bin/bash%#!/usr/bin/env zsh%' -i symtree.sh
+autoreconf -fi
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-python
+make ${JOBSFLAGS}
+make install
+for my_bin in scanelf lddtree symtree ; do
+	[[ "${my_bin}" == "scanelf" ]] && ${CROSS_TC}-strip --strip-unneeded ../bin/${my_bin}
+	cp ../bin/${my_bin} ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/${my_bin}
+done
 
 ## static cURL (7.65.1)
 #
