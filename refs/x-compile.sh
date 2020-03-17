@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16906 2020-02-27 06:06:05Z NiLuJe $
+# $Id: x-compile.sh 16955 2020-03-10 16:57:44Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -58,10 +58,20 @@ update_title_info()
 		# Try to correct the total count by hard-coding the amount of branches...
 		# There's zlib vs. zlib-ng...
 		pkgCount="$((pkgCount - 1))"
+		# There's the GCC 4.9 FT stack thingy...
+		if [[ "${KINDLE_TC}" == "K5" ]] ; then
+			pkgCount="$((pkgCount + 3))"
+		fi
+		# There's libtommath & libtomcrypt
+		if [[ "${BUILD_UPSTREAM_LIBTOM}" != "true" ]] ; then
+			pkgCount="$((pkgCount - 2))"
+		fi
 		# There's Gandalf which we only build for K5 & PW2...
 		if [[ "${KINDLE_TC}" != "K5" ]] && [[ "${KINDLE_TC}" != "PW2" ]] ; then
 			pkgCount="$((pkgCount - 1))"
 		fi
+		# There's nettle vs. nettle-git
+		pkgCount="$((pkgCount - 1))"
 		# There's ICU which we don't always build...
 		if [[ "${KINDLE_TC}" != "K5" ]] && [[ "${KINDLE_TC}" != "PW2" ]] && [[ "${KINDLE_TC}" != "KOBO" ]] ; then
 			pkgCount="$((pkgCount - 1))"
@@ -1144,7 +1154,7 @@ Build_FreeType_Stack() {
 	# Funnily enough, it depends on freetype too...
 	# NOTE: I thought I *might* have to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512,
 	#       but in practice in turns out that wasn't needed ;).
-	FT_VER="2.10.1_p20200216"
+	FT_VER="2.10.1_p20200302"
 	FT_SOVER="6.17.1"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
@@ -1373,7 +1383,7 @@ unset scanf_cv_alloc_modifier
 echo "* Building fontconfig . . ."
 echo ""
 FC_SOVER="1.12.0"
-FC_VER="2.13.91_p20200219"
+FC_VER="2.13.91_p20200227"
 cd ..
 tar -xvJf /usr/portage/distfiles/fontconfig-${FC_VER}.tar.xz
 cd fontconfig
@@ -1439,8 +1449,8 @@ unset PKG_CONFIG
 echo "* Building coreutils . . ."
 echo ""
 cd ..
-tar xvJf /usr/portage/distfiles/coreutils-8.31.tar.xz
-cd coreutils-8.31
+tar xvJf /usr/portage/distfiles/coreutils-8.32.tar.xz
+cd coreutils-8.32
 update_title_info
 tar xvJf /usr/portage/distfiles/coreutils-8.30-patches-01.tar.xz
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
@@ -1450,6 +1460,7 @@ fi
 for patchfile in patch/*.patch ; do
 	patch -p1 < ${patchfile}
 done
+patch -p1 < /usr/portage/sys-apps/coreutils/files/coreutils-8.32-ls-restore-8.31-behavior.patch
 # Avoid (re)generating manpages...
 for my_man in man/*.x ; do
 	touch ${my_man/%x/1}
@@ -2094,10 +2105,10 @@ export LDFLAGS="${BASE_LDFLAGS}"
 ## ncurses & htop for USBNet
 echo "* Building ncurses (narrowc) . . ."
 echo ""
-NCURSES_SOVER="6.1"
+NCURSES_SOVER="6.2"
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.2.tar.gz
-cd ncurses-6.2
+tar -I pigz -xvf /usr/portage/distfiles/ncurses-${NCURSES_SOVER}.tar.gz
+cd ncurses-${NCURSES_SOVER}
 update_title_info
 export CFLAGS="${BASE_CFLAGS}"
 export CXXFLAGS="${BASE_CFLAGS}"
@@ -2119,8 +2130,8 @@ cd ${CBUILD}
 env CHOST=${CBUILD} CFLAGS="-O2 -pipe -march=native" CXXFLAGS="-O2 -pipe -march=native" LDFLAGS="-Wl,--as-needed -static" CPPFLAGS="-D_GNU_SOURCE" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../configure --{build,host}=${CBUILD} --without-shared --with-normal
 # NOTE: use our host's tic
 MY_BASE_PATH="${PATH}"
-export PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs:${PATH}"
-export TIC_PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs/tic"
+export PATH="${TC_BUILD_DIR}/ncurses-${NCURSES_SOVER}/${CBUILD}/progs:${PATH}"
+export TIC_PATH="${TC_BUILD_DIR}/ncurses-${NCURSES_SOVER}/${CBUILD}/progs/tic"
 cd ..
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-term-driver --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant --with-termlib --disable-stripping
 # NOTE: Build our hosts's tic
@@ -2146,18 +2157,19 @@ ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/lib
 echo "* Building ncurses (widec) . . ."
 echo ""
 cd ..
-rm -rf ncurses-6.1
-tar -I pigz -xvf /usr/portage/distfiles/ncurses-6.1.tar.gz
-cd ncurses-6.1
+rm -rf ncurses-${NCURSES_SOVER}
+tar -I pigz -xvf /usr/portage/distfiles/ncurses-${NCURSES_SOVER}.tar.gz
+cd ncurses-${NCURSES_SOVER}
 update_title_info
-bzcat /usr/portage/distfiles/ncurses-6.1-20181020-patch.sh.bz2 > ncurses-6.1-20181020-patch.sh
-sh ncurses-6.1-20181020-patch.sh
+#bzcat /usr/portage/distfiles/ncurses-6.1-20190609-patch.sh.bz2 > ncurses-6.1-20190609-patch.sh
+#sh ncurses-6.1-20190609-patch.sh
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.7-nongnu.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-rxvt-unicode-9.15.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-pkg-config.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.9-gcc-5.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-ticlib.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-cppflags-cross.patch
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.2-no_user_ldflags_in_libs.patch
 export CPPFLAGS="${BASE_CPPFLAGS} -D_GNU_SOURCE"
 # NOTE: cross-compile fun times, build tic for our host, in case we're not running the same ncurses version...
 export CBUILD="$(uname -m)-pc-linux-gnu"
@@ -2166,8 +2178,8 @@ cd ${CBUILD}
 env CHOST=${CBUILD} CFLAGS="-O2 -pipe -march=native" CXXFLAGS="-O2 -pipe -march=native" LDFLAGS="-Wl,--as-needed -static" CPPFLAGS="-D_GNU_SOURCE" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../configure --{build,host}=${CBUILD} --without-shared --with-normal
 # NOTE: use our host's tic
 MY_BASE_PATH="${PATH}"
-export PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs:${PATH}"
-export TIC_PATH="${TC_BUILD_DIR}/ncurses-6.1/${CBUILD}/progs/tic"
+export PATH="${TC_BUILD_DIR}/ncurses-${NCURSES_SOVER}/${CBUILD}/progs:${PATH}"
+export TIC_PATH="${TC_BUILD_DIR}/ncurses-${NCURSES_SOVER}/${CBUILD}/progs/tic"
 cd ..
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-term-driver --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --enable-widec --without-pthread --without-reentrant --with-termlib --includedir="${TC_BUILD_DIR}/include/ncursesw" --disable-stripping
 # NOTE: Build our hosts's tic
@@ -2286,8 +2298,8 @@ cp shlock ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/shlock
 echo "* Building protobuf . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/protobuf-3.11.2.tar.gz
-cd protobuf-3.11.2
+tar -I pigz -xvf /usr/portage/distfiles/protobuf-3.11.4.tar.gz
+cd protobuf-3.11.4
 update_title_info
 patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.11.0-disable_no-warning-test.patch
 patch -p1 < /usr/portage/dev-libs/protobuf/files/protobuf-3.11.0-system_libraries.patch
@@ -2335,7 +2347,7 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.4.2_p20200213.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.4.2_p20200302.tar.xz
 cd libarchive
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
@@ -2538,8 +2550,8 @@ IM_SOVER="6.0.0"
 cd ..
 # FWIW, you can pretty much use the same configure line for GraphicsMagick, although the ScreenSavers hack won't work with it.
 # It doesn't appear to need the quantize patch though, it consumes a 'normal' amount of memory by default.
-tar xvJf /usr/portage/distfiles/ImageMagick-6.9.10-92.tar.xz
-cd ImageMagick-6.9.10-92
+tar xvJf /usr/portage/distfiles/ImageMagick-6.9.11-0.tar.xz
+cd ImageMagick-6.9.11-0
 update_title_info
 # Use the same codepath as on iPhone devices to nerf the 65MB alloc of the dither code... (We also use a quantum-depth of 8 to keep the memory usage down)
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/ImageMagick-6.8.6-5-nerf-dither-mem-alloc.patch
@@ -3248,7 +3260,7 @@ done
 cd ..
 ## CFFI
 rm -rf cffi
-until hg clone https://bitbucket.org/cffi/cffi ; do
+until hg clone ssh://hg@foss.heptapod.net/pypy/cffi ; do
 	rm -rf cffi
 	sleep 15
 done
@@ -4061,9 +4073,9 @@ export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 make ${JOBSFLAGS} V=1
 make install
 export LDFLAGS="${BASE_LDFLAGS}"
-cp ../lib/libpcre.so.1.2.11 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre.so.1
+cp ../lib/libpcre.so.1.2.12 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre.so.1
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre.so.1
-cp ../lib/libpcreposix.so.0.0.6 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcreposix.so.0
+cp ../lib/libpcreposix.so.0.0.7 ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcreposix.so.0
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcreposix.so.0
 
 ## sshfs for USBNet (Build it at the end, I don't want glib to be automagically pulled by something earlier...)
@@ -4920,8 +4932,8 @@ CURL_SOVER="4.6.0"
 echo "* Building cURL . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/curl-7.68.0.tar.xz
-cd curl-7.68.0
+tar -xvJf /usr/portage/distfiles/curl-7.69.0.tar.xz
+cd curl-7.69.0
 update_title_info
 # Gentoo patches
 patch -p1 < /usr/portage/net-misc/curl/files/curl-7.30.0-prefix.patch
@@ -4936,7 +4948,7 @@ cp lib/ca-bundle.crt ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/ca-bundle.crt
 # Setup our rpath...
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 # NOTE: esni isn't in mainline OpenSSL (https://bugs.gentoo.org/699648)
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --without-gnutls --without-mbedtls --without-nss --without-polarssl --without-winssl --with-ca-fallback --with-ca-bundle=${DEVICE_USERSTORE}/usbnet/lib/ca-bundle.crt --with-ssl --with-ca-path=/etc/ssl/certs --disable-alt-svc --enable-crypto-auth --enable-dict --disable-esni --enable-file --enable-ftp --enable-gopher --enable-http --enable-imap --disable-ldap --disable-ldaps --disable-ntlm-wb --enable-pop3 --enable-rt --enable-rtsp --disable-smb --without-libssh2 --enable-smtp --enable-telnet -enable-tftp --enable-tls-srp --disable-ares --enable-cookies --enable-dateparse --enable-dnsshuffle --enable-doh --enable-hidden-symbols --enable-http-auth --disable-ipv6 --enable-largefile --without-libpsl --enable-manual --enable-mime --enable-netrc --enable-progress-meter --enable-proxy --disable-sspi --enable-threaded-resolver --enable-pthreads --disable-versioned-symbols --without-amissl --without-bearssl --without-cyassl --without-darwinssl --without-fish-functions-dir --without-libidn2 --without-gssapi --without-libmetalink --without-nghttp2 --without-librtmp --without-brotli --without-schannel --without-secure-transport --without-spnego --without-winidn --without-wolfssl --with-zlib
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --without-gnutls --without-mbedtls --without-nss --without-polarssl --without-winssl --with-ca-fallback --with-ca-bundle=${DEVICE_USERSTORE}/usbnet/lib/ca-bundle.crt --with-ssl --with-ca-path=/etc/ssl/certs --disable-alt-svc --enable-crypto-auth --enable-dict --disable-esni --enable-file --enable-ftp --enable-gopher --enable-http --enable-imap --disable-ldap --disable-ldaps --disable-ntlm-wb --enable-pop3 --enable-rt --enable-rtsp --disable-smb --without-libssh2 --enable-smtp --enable-telnet -enable-tftp --enable-tls-srp --disable-ares --enable-cookies --enable-dateparse --enable-dnsshuffle --enable-doh --enable-hidden-symbols --enable-http-auth --disable-ipv6 --enable-largefile --enable-manual --enable-mime --enable-netrc --enable-progress-meter --enable-proxy --disable-sspi --enable-threaded-resolver --enable-pthreads --disable-versioned-symbols --without-amissl --without-bearssl --without-cyassl --without-darwinssl --without-fish-functions-dir --without-libidn2 --without-gssapi --without-libmetalink --without-nghttp2 --without-libpsl --without-nghttp3 --without-ngtcp2 --without-quiche --without-librtmp --without-brotli --without-schannel --without-secure-transport --without-spnego --without-winidn --without-wolfssl --with-zlib
 make ${JOBSFLAGS} V=1
 make install
 ${CROSS_TC}-strip --strip-unneeded ../bin/curl
@@ -5016,6 +5028,8 @@ cd pax-utils-1.2.5
 update_title_info
 # NOTE: We don't have bash, but we do have ZSH ;).
 sed -e 's%^#!/bin/bash%#!/usr/bin/env zsh%' -i symtree.sh
+# Huh. We probably don't need to run autoreconf anyway...
+touch ./NEWS ./README ./AUTHORS ./ChangeLog
 autoreconf -fi
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-python
 make ${JOBSFLAGS}
