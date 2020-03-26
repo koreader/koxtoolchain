@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 16955 2020-03-10 16:57:44Z NiLuJe $
+# $Id: x-compile.sh 16988 2020-03-26 17:50:24Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -318,13 +318,13 @@ EOF
 
 ## Choose your TC!
 case ${1} in
-	k2 | K2 | k3 | K3 )
+	kindle | k2 | K2 | k3 | K3 )
 		KINDLE_TC="K3"
 	;;
-	k4 | K4 | k5 | K5 )
+	kindle5 | k4 | K4 | k5 | K5 )
 		KINDLE_TC="K5"
 	;;
-	pw2 | PW2 )
+	kindlepw2 | pw2 | PW2 )
 		KINDLE_TC="PW2"
 	;;
 	kobo | Kobo | KOBO )
@@ -333,13 +333,13 @@ case ${1} in
 	nickel | Nickel | NICKEL )
 		KINDLE_TC="NICKEL"
 	;;
-	mk7 | Mk7 | MK7 )
+	kobomk7 | mk7 | Mk7 | MK7 )
 		KINDLE_TC="MK7"
 	;;
 	remarkable | reMarkable | Remarkable )
 		KINDLE_TC="REMARKABLE"
 	;;
-	pb | PB | pocketbook )
+	pocketbook | pb | PB )
 		KINDLE_TC="PB"
 	;;
 	# Or build them?
@@ -1911,8 +1911,8 @@ fi
 echo "* Building OpenSSL 1.1.1 . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/openssl-1.1.1d.tar.gz
-cd openssl-1.1.1d
+tar -I pigz -xvf /usr/portage/distfiles/openssl-1.1.1e.tar.gz
+cd openssl-1.1.1e
 update_title_info
 OPENSSL_SOVER="1.1"
 export CPPFLAGS="${BASE_CPPFLAGS} -DOPENSSL_NO_BUF_FREELISTS"
@@ -1923,9 +1923,6 @@ export CFLAGS="${CPPFLAGS} ${BASE_CFLAGS}"
 export LDFLAGS="${BASE_LDFLAGS} -Wa,--noexecstack -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib -Wl,-rpath=${DEVICE_USERSTORE}/python3/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
 rm -f Makefile
 patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.1.0j-parallel_install_fix.patch
-patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.1.1d-fix-zlib.patch
-patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.1.1d-fix-potential-memleaks-w-BN_to_ASN1_INTEGER.patch
-patch -p1 < /usr/portage/dev-libs/openssl/files/openssl-1.1.1d-reenable-the-stitched-AES-CBC-HMAC-SHA-implementations.patch
 # FIXME: Periodically check if the Kernel has been tweaked, and we can use the PMCCNTR in userland.
 # NOTE: When Amazon ported FW 5.4.x to the PW1, they apparently helpfully backported this regression too, so apply that to K5 builds, too...
 # NOTE: Since OpenSSL 1.0.2, there's also the crypto ARMv8 stuff, but that of course will never happen for us, so we can just ditch it.
@@ -2631,9 +2628,9 @@ fi
 if [[ "${SQLITE_WITH_ICU}" == "true" ]] ; then
 	echo "* Building ICU . . ."
 	echo ""
-	ICU_SOVER="65.1"
+	ICU_SOVER="66.1"
 	cd ..
-	tar -I pigz -xvf /usr/portage/distfiles/icu4c-65_1-src.tgz
+	tar -I pigz -xvf /usr/portage/distfiles/icu4c-66_1-src.tgz
 	cd icu/source
 	update_title_info
 	patch -p1 < /usr/portage/dev-libs/icu/files/icu-65.1-remove-bashisms.patch
@@ -4084,8 +4081,8 @@ ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/lib
 echo "* Building glib . . ."
 echo ""
 cd ..
-tar xvJf /usr/portage/distfiles/glib-2.62.5.tar.xz
-cd glib-2.62.5
+tar xvJf /usr/portage/distfiles/glib-2.64.1.tar.xz
+cd glib-2.64.1
 update_title_info
 #tar xvJf /usr/portage/distfiles/glib-2.58.1-patchset.tar.xz
 for patchfile in patches/*.patch ; do
@@ -4127,7 +4124,7 @@ unset my_meson_props
 #       This is extremely stupid. Deal with that nonsense.
 #       According to https://mesonbuild.com/Running-Meson.html#environment-variables,
 #       The idea appears to be that the env should only apply to the native TC. Which is... weird, and extremely counter-intuitive, but, okay...
-env -u CPPFLAGS -u CFLAGS -u CXXFLAGS -u LDFLAGS meson . builddir --cross-file MesonCross.txt --buildtype plain -Ddefault_library=static -Dselinux=disabled -Dxattr=false -Dlibmount=false -Dinternal_pcre=false -Dman=false -Ddtrace=false -Dsystemtap=false -Dgtk_doc=false -Dfam=false -Dinstalled_tests=false -Dnls=enabled -Doss_fuzz=disabled
+env -u CPPFLAGS -u CFLAGS -u CXXFLAGS -u LDFLAGS meson . builddir --cross-file MesonCross.txt --buildtype plain -Ddefault_library=static -Dselinux=disabled -Dxattr=false -Dlibmount=disabled -Dinternal_pcre=false -Dman=false -Ddtrace=false -Dsystemtap=false -Dgtk_doc=false -Dfam=false -Dinstalled_tests=false -Dnls=enabled -Doss_fuzz=disabled
 ninja -v -C builddir
 ninja -v -C builddir install
 export CFLAGS="${BASE_CFLAGS}"
@@ -4137,8 +4134,8 @@ export CXXFLAGS="${BASE_CFLAGS}"
 echo "* Building fuse . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/fuse-3.9.0.tar.xz
-cd fuse-3.9.0
+tar -xvJf /usr/portage/distfiles/fuse-3.9.1.tar.xz
+cd fuse-3.9.1
 update_title_info
 
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
@@ -4643,8 +4640,8 @@ cp -f ${DEVICE_USERSTORE}/usbnet/share/misc/magic.mgc ${BASE_HACKDIR}/USBNetwork
 echo "* Building nano . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/nano-4.8.tar.gz
-cd nano-4.8
+tar -I pigz -xvf /usr/portage/distfiles/nano-4.9.tar.gz
+cd nano-4.9
 update_title_info
 # NOTE: On Kindles, we hit a number of dumb collation issues with regexes needed for syntax highlighting on some locales (notably en_GB...) on some FW versions, so enforce en_US...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/nano-kindle-locale-hack.patch
@@ -4757,8 +4754,8 @@ cp ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlogin ${BASE_HACKDIR}/USBNetwork/src/u
 echo "* Building XZ-Utils . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/xz-5.2.4.tar.gz
-cd xz-5.2.4
+tar -I pigz -xvf /usr/portage/distfiles/xz-5.2.5.tar.gz
+cd xz-5.2.5
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
 ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-nls --disable-threads --enable-static --disable-shared --disable-{lzmadec,lzmainfo,lzma-links,scripts}
@@ -4780,13 +4777,16 @@ until git clone -b master --single-branch --depth 1 https://github.com/facebook/
 done
 cd zstd
 update_title_info
-# Fix pthread detection
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zstd-1.4.4-fix-threading-detection.patch
+# Gentoo patches
+patch -p1 < /usr/portage/app-arch/zstd/files/zstd-1.4.4-make43.patch
+patch -p1 < /usr/portage/app-arch/zstd/files/zstd-1.4.4-pkgconfig_libdir.patch
+export CFLAGS="${BASE_CFLAGS} -pthread"
 cd programs
 make -j8 CC="${CROSS_TC}-gcc" CXX="${CROSS_TC}-g++" AR="${CROSS_TC}-gcc-ar" zstd-decompress
 # And send that to our common pool of binaries...
 cp zstd-decompress ${BASE_HACKDIR}/Common/bin/zstd-decompress
 ${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/Common/bin/zstd-decompress
+export CFLAGS="${BASE_CFLAGS}"
 cd ..
 
 ## AG (because it's awesome)
@@ -4932,8 +4932,8 @@ CURL_SOVER="4.6.0"
 echo "* Building cURL . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/curl-7.69.0.tar.xz
-cd curl-7.69.0
+tar -xvJf /usr/portage/distfiles/curl-7.69.1.tar.xz
+cd curl-7.69.1
 update_title_info
 # Gentoo patches
 patch -p1 < /usr/portage/net-misc/curl/files/curl-7.30.0-prefix.patch
