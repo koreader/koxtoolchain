@@ -65,13 +65,14 @@ Build_CT-NG() {
 			echo "[INFO ]  ================================================================="
 			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_target}/bin to your PATH."
 			echo "[INFO ]  ================================================================="
-			echo "[INFO ]  The x-compile.sh script can do that (and more) for you:"
-			echo "[INFO ]  * If you need a persistent custom sysroot (e.g., if you intend to build a full dependency chain)"
-			echo "[INFO ]    > source ${PWD}/refs/x-compile.sh ${1} env"
-			echo "[INFO ]  * If you just need a compiler:"
-			echo "[INFO ]    > source ${PWD}/refs/x-compile.sh ${1} env bare"
 		popd
 	popd
+
+	echo "[INFO ]  The x-compile.sh script can do that (and more) for you:"
+	echo "[INFO ]  * If you need a persistent custom sysroot (e.g., if you intend to build a full dependency chain)"
+	echo "[INFO ]    > source ${PWD}/refs/x-compile.sh ${TC_BUILD_DIR} env"
+	echo "[INFO ]  * If you just need a compiler:"
+	echo "[INFO ]    > source ${PWD}/refs/x-compile.sh ${TC_BUILD_DIR} env bare"
 }
 
 HELP_MSG="
