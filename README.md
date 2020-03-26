@@ -36,7 +36,7 @@ You can use `./gen-tc.sh -h` to get a list of supported platforms.
 
 After the build is finished, you should be able to find your cross ToolChains under the `~/x-tools` directory.
 
-The [reference script](/refs/x-compile.sh) can be used to automatically setup a cross-compilation environment (`PATH`, `*FLAGS` & all that jazz), as mentioned at the end of a TC build.
+The [reference script](/refs/x-compile.sh) can be used to automatically setup a cross-compilation environment (`PATH`, `*FLAGS` & all that jazz), as mentioned at the end of a TC build.  
 e.g., for a Kobo TC:
 ```shell
 source refs/x-compile.sh kobo env
