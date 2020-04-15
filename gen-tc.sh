@@ -88,6 +88,7 @@ Supported platforms:
 	remarkable
 	cervantes
 	pocketbook
+	bookeeen
 "
 
 if [ $# -lt 1 ]; then
@@ -105,25 +106,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -131,25 +132,25 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
@@ -188,6 +189,12 @@ case $1 in
 			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
 		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
 		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include"
+		;;
+	bookeen)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			5698356e0a762636b470bcc0b25b3471e3e7fe61 \
+			"arm-${1}-linux-gnueabi"
 		;;
 	*)
 		echo "[!] $1 not supported!"
