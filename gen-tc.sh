@@ -106,25 +106,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -132,25 +132,25 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
@@ -193,7 +193,7 @@ case $1 in
 	bookeen)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			5132a72d11916d94e7bc3be16a37795f645abe6e \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
