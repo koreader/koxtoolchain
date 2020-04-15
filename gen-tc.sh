@@ -88,7 +88,7 @@ Supported platforms:
 	remarkable
 	cervantes
 	pocketbook
-	bookeeen
+	bookeen
 "
 
 if [ $# -lt 1 ]; then
