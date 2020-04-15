@@ -62,12 +62,14 @@ Build_CT-NG() {
 			ct-ng oldconfig
 			ct-ng updatetools
 			nice ct-ng build
+			echo ""
 			echo "[INFO ]  ================================================================="
 			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_target}/bin to your PATH."
 			echo "[INFO ]  ================================================================="
 		popd
 	popd
 
+	echo "[INFO ]  ================================================================="
 	echo "[INFO ]  The x-compile.sh script can do that (and more) for you:"
 	echo "[INFO ]  * If you need a persistent custom sysroot (e.g., if you intend to build a full dependency chain)"
 	echo "[INFO ]    > source ${PWD}/refs/x-compile.sh ${TC_BUILD_DIR} env"
