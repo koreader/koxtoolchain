@@ -62,12 +62,14 @@ Build_CT-NG() {
 			ct-ng oldconfig
 			ct-ng updatetools
 			nice ct-ng build
+			echo ""
 			echo "[INFO ]  ================================================================="
 			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_target}/bin to your PATH."
 			echo "[INFO ]  ================================================================="
 		popd
 	popd
 
+	echo "[INFO ]  ================================================================="
 	echo "[INFO ]  The x-compile.sh script can do that (and more) for you:"
 	echo "[INFO ]  * If you need a persistent custom sysroot (e.g., if you intend to build a full dependency chain)"
 	echo "[INFO ]    > source ${PWD}/refs/x-compile.sh ${TC_BUILD_DIR} env"
@@ -88,6 +90,7 @@ Supported platforms:
 	remarkable
 	cervantes
 	pocketbook
+	bookeen
 "
 
 if [ $# -lt 1 ]; then
@@ -105,25 +108,25 @@ case $1 in
 		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -131,25 +134,25 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			c54acce519925798e7ec6f3a66aff39bea694132 \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
@@ -188,6 +191,12 @@ case $1 in
 			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
 		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
 		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include"
+		;;
+	bookeen)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			"arm-${1}-linux-gnueabi"
 		;;
 	*)
 		echo "[!] $1 not supported!"
