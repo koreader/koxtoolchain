@@ -56,6 +56,12 @@ No such worries on Kobo & Cervantes, though ;).
 
 The nickel TC is a Kobo variant that mimics Kobo's own TC (as of FW >= 4.6). It is *not* recommended for general purpose stuff, only use it if you have a specific need for it (which should essentially be limited to working with Kobo's nickel, or Kobo's kernels).
 
+The pocketbook TC aims for maximum backward compatibility while still keeping inkview support.
+
+The remarkable TC aims for FW >= 2.x compatibility.
+
+The bookeen TC has only been tested on AWA13 devices, but *should* theoretically handle OMAP3611 ones, too.
+
 ## Known Issues
 
 Only actively tested on Linux hosts.  
