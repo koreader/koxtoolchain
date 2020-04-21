@@ -17,10 +17,10 @@ Build scripts to help generate cross ToolChains for various platforms supported 
 sudo pacman -S base-devel gperf help2man bison texinfo flex gawk
 ```
 
-## For Ubuntu users:
+## For Debian/Ubuntu users:
 
 ```bash
-sudo apt-get install build-essential gperf help2man bison texinfo flex gawk
+sudo apt-get install build-essential gperf help2man bison texinfo flex gawk autoconf automake wget curl file libncurses-dev
 ```
 
 ## Usage
