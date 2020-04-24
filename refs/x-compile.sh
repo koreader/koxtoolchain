@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 17050 2020-04-15 18:03:48Z NiLuJe $
+# $Id: x-compile.sh 17134 2020-04-24 03:14:21Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -406,7 +406,7 @@ esac
 # To fetch everything:
 #	cave resolve -1 -z -f -x sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb --uninstalls-may-break '*/*'
 #	OR
-#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python:3.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb libxml2 libxslt pax-utils
+#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python:3.7 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb libxml2 libxslt pax-utils libpcre2 less
 #
 ##
 
@@ -520,10 +520,8 @@ case ${KINDLE_TC} in
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
 		export PKG_CONFIG="${BASE_PKG_CONFIG}"
-		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -589,10 +587,8 @@ case ${KINDLE_TC} in
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
 		export PKG_CONFIG="${BASE_PKG_CONFIG}"
-		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -682,10 +678,8 @@ case ${KINDLE_TC} in
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
 		export PKG_CONFIG="${BASE_PKG_CONFIG}"
-		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -708,7 +702,7 @@ case ${KINDLE_TC} in
 			NICKEL )
 				CROSS_TC="arm-nickel-linux-gnueabihf"
 				# NOTE: We use a directory tree slightly more in line w/ ct-ng here...
-				TC_BUILD_DIR="${HOME}/Kobo/CrossTool/Build_${KINDLE_TC}/${CROSS_TC}/${CROSS_TC}/sysroot"
+				TC_BUILD_DIR="${HOME}/Kobo/CrossTool/Build_${KINDLE_TC}/${CROSS_TC}/${CROSS_TC}/sysroot/usr"
 			;;
 			MK7 )
 				CROSS_TC="arm-kobomk7-linux-gnueabihf"
@@ -772,9 +766,8 @@ case ${KINDLE_TC} in
 		## NOTE: For Nickel, we want to pickup the sysroot, too, because this is where we chucked Qt...
 		if [[ "${KINDLE_TC}" == "NICKEL" ]] ; then
 			BASE_SYSROOT="${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot"
-			BASE_SYSROOT_PKG_CONFIG_PATH="${BASE_SYSROOT}/lib/pkgconfig"
-			BASE_PKG_CONFIG_PATH="${BASE_SYSROOT_PKG_CONFIG_PATH}:${TC_BUILD_DIR}/lib/pkgconfig"
-			BASE_PKG_CONFIG_LIBDIR="${BASE_SYSROOT_PKG_CONFIG_PATH}:${TC_BUILD_DIR}/lib/pkgconfig"
+			BASE_SYSROOT_PKG_CONFIG_LIBDIR="${BASE_SYSROOT}/usr/lib/pkgconfig"
+			BASE_PKG_CONFIG_LIBDIR="${BASE_SYSROOT_PKG_CONFIG_LIBDIR}:${TC_BUILD_DIR}/lib/pkgconfig"
 			# And since we'll have potentially two different sources of .pc files, and some of them may have been been baked with a no-longer viable build prefix, letting pkg-config compute the prefix based on the .pc's location sounds like a Great Idea!
 			# c.f., https://github.com/geek1011/kobo-plugin-experiments/commit/7020977c611c9301c07ef1cb24656fd09acef77a
 			# NOTE: We bypass the TC's pkg-config wrapper because we want to use multiple searchpaths, no fixed sysroot, and --define-prefix ;).
@@ -782,14 +775,12 @@ case ${KINDLE_TC} in
 			export PKG_CONFIG="${BASE_PKG_CONFIG}"
 
 			# Let pkg-config strip the right redundant system paths
-			export PKG_CONFIG_SYSTEM_INCLUDE_PATH="${BASE_SYSROOT}/include"
+			export PKG_CONFIG_SYSTEM_INCLUDE_PATH="${BASE_SYSROOT}/usr/include"
 			export PKG_CONFIG_SYSTEM_LIBRARY_PATH="${BASE_SYSROOT}/usr/lib:${BASE_SYSROOT}/lib"
 		else
-			BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 			BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
 		fi
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -858,10 +849,8 @@ case ${KINDLE_TC} in
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
 		export PKG_CONFIG="${BASE_PKG_CONFIG}"
-		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -930,10 +919,8 @@ case ${KINDLE_TC} in
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
 		export PKG_CONFIG="${BASE_PKG_CONFIG}"
-		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -999,10 +986,8 @@ case ${KINDLE_TC} in
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
 		export PKG_CONFIG="${BASE_PKG_CONFIG}"
-		BASE_PKG_CONFIG_PATH="${TC_BUILD_DIR}/lib/pkgconfig"
 		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
-		export PKG_CONFIG_DIR=
-		export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}"
+		export PKG_CONFIG_PATH=""
 		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
 
 		## CMake is hell.
@@ -1032,7 +1017,6 @@ if [[ "${2}" == "env" ]] ; then
 		# The Makefile gets the TC's triplet from CHOST
 		export CHOST="${CROSS_TC}"
 		# We don't want to pull any of our own libs through pkg-config
-		unset PKG_CONFIG_DIR
 		unset PKG_CONFIG_PATH
 		unset PKG_CONFIG_LIBDIR
 		# We have our own CMake shenanigans
@@ -1065,7 +1049,6 @@ if [[ "${2}" == "env" ]] ; then
 		#       which is why we unset PKG_CONFIG instead of enforcing it to unprefixed pkg-config.
 		#       (autotools will prefer ${CROSS_TC}-pkg-config, i.e., the wrapper pointing to the sysroot).
 		unset PKG_CONFIG
-		unset PKG_CONFIG_DIR
 		unset PKG_CONFIG_PATH
 		unset PKG_CONFIG_LIBDIR
 		# We also don't want to look at or pick up anything from our own custom sysroot, to make sure vendoring works as intended in standalone projects
@@ -1079,7 +1062,6 @@ if [[ "${2}" == "env" ]] ; then
 		echo "* With Clang :)"
 		# Implies bare, because this is just a (fun?) experiment...
 		# We don't want to pull any of our own libs through pkg-config
-		unset PKG_CONFIG_DIR
 		unset PKG_CONFIG_PATH
 		unset PKG_CONFIG_LIBDIR
 		# We also don't want to look at or pick up anything from our own custom sysroot, to make sure vendoring works as intended in standalone projects
@@ -1160,7 +1142,8 @@ meson_setup() {
 	if [[ "${MESON_NEEDS_PKGCFG_WRAPPER}" == "true" ]] ; then
 		cat <<-EOF > "${TC_BUILD_DIR}/bin/pkg-config"
 			#!/bin/sh
-			exec ${PKG_CONFIG} --define-variable=prefix=/ "\$@"
+			export PKG_CONFIG_SYSROOT_DIR=""
+			exec ${PKG_CONFIG} --define-prefix "\$@"
 		EOF
 		chmod -cvR a+x "${TC_BUILD_DIR}/bin/pkg-config"
 	fi
@@ -2006,8 +1989,8 @@ fi
 echo "* Building OpenSSL 1.1.1 . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/openssl-1.1.1f.tar.gz
-cd openssl-1.1.1f
+tar -I pigz -xvf /usr/portage/distfiles/openssl-1.1.1g.tar.gz
+cd openssl-1.1.1g
 update_title_info
 OPENSSL_SOVER="1.1"
 export CPPFLAGS="${BASE_CPPFLAGS} -DOPENSSL_NO_BUF_FREELISTS"
@@ -2993,14 +2976,14 @@ patch -p1 < /usr/portage/dev-libs/libxslt/files/libxslt-1.1.28-disable-static-mo
 patch -p1 < /usr/portage/distfiles/libxslt-1.1.33-CVE-2019-11068.patch
 autoreconf -fi
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/python3/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
-env ac_cv_path_ac_pt_XML_CONFIG=${TC_BUILD_DIR}/bin/xml2-config PKG_CONFIG="pkg-config --static" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-static --enable-shared --without-crypto --without-debug --without-mem-debug --without-python
+env ac_cv_path_ac_pt_XML_CONFIG=${TC_BUILD_DIR}/bin/xml2-config PKG_CONFIG="${BASE_PKG_CONFIG} --static" ./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --disable-static --enable-shared --without-crypto --without-debug --without-mem-debug --without-python
 make ${JOBSFLAGS} V=1
 make install
 export LDFLAGS="${BASE_LDFLAGS}"
 
 ## Python for ScreenSavers
-PYTHON_CUR_VER="2.7.17"
-PYTHON2_PATCH_REV="2.7.17-r1"
+PYTHON_CUR_VER="2.7.18"
+PYTHON2_PATCH_REV="2.7.18"
 echo "* Building Python . . ."
 echo ""
 cd ..
@@ -3072,7 +3055,7 @@ export PGEN_FOR_BUILD="./Parser/hostpgen"
 export CC="${CROSS_TC}-gcc"
 export CXX="${CROSS_TC}-g++"
 # Huh. For some reason, adding --static here breaks it... (Well, it's not useful here anyway, but, still...)
-export ac_cv_path_PKG_CONFIG="pkg-config"
+export ac_cv_path_PKG_CONFIG="${BASE_PKG_CONFIG}"
 # Setup an rpath since we use a shared libpython to be able to build third-party modules...
 export LDFLAGS="${BASE_LDFLAGS} -L. -Wl,-rpath=${DEVICE_USERSTORE}/python/lib"
 # NOTE: Used to fail to build w/ LTO (bad instruction: fldcw [sp,#6] & fnstcw [sp,#6])... (Linaro GCC 5.2 2015.09 & binutils 2.25.1)
@@ -3137,7 +3120,7 @@ unset PYTHON_DISABLE_MODULES
 
 ## Python 3
 PYTHON3_CUR_VER="3.8.2"
-PYTHON3_PATCH_REV="3.8.1-r2"
+PYTHON3_PATCH_REV="3.8.2"
 echo "* Building Python 3 . . ."
 echo ""
 cd ..
@@ -3204,7 +3187,7 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	sed -e "s#/mnt/us#${DEVICE_USERSTORE}#g" -i Python/initconfig.c
 fi
 # NOTE: Enable the shared library to be able to compile third-party C modules...
-env PKG_CONFIG="pkg-config --static" OPT="" ./configure --prefix=${TC_BUILD_DIR}/python3 --build=${CBUILD} --host=${CROSS_TC} --oldincludedir=${TC_BUILD_DIR}/include --enable-shared --disable-ipv6 --with-computed-gotos --with-libc="" --enable-loadable-sqlite-extensions --without-ensurepip --with-system-expat --with-system-ffi
+env PKG_CONFIG="${BASE_PKG_CONFIG} --static" OPT="" ./configure --prefix=${TC_BUILD_DIR}/python3 --build=${CBUILD} --host=${CROSS_TC} --oldincludedir=${TC_BUILD_DIR}/include --enable-shared --disable-ipv6 --with-computed-gotos --with-libc="" --enable-loadable-sqlite-extensions --without-ensurepip --with-system-expat --with-system-ffi
 # NOTE: Prevent the K3 from picking up a few unsupported symbols (epoll_create1, dup3, __sched_cpucount, __sched_cpufree & __sched_cpualloc)
 # We do it post-configure, because for some reason, at least for epoll_create1, it's happily ignoring our enforced ac_cv_func values...
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
@@ -5145,6 +5128,65 @@ for my_bin in scanelf lddtree symtree ; do
 	[[ "${my_bin}" == "scanelf" ]] && ${CROSS_TC}-strip --strip-unneeded ../bin/${my_bin}
 	cp ../bin/${my_bin} ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/${my_bin}
 done
+
+## PCRE2
+PCRE2_SOVER="0.9.0"
+PCRE2_POSIX_SOVER="2.0.3"
+PCRE2_VERSION="10.34"
+echo "* Building pcre2 . . ."
+tar -I lbzip2 -xvf /usr/portage/distfiles/pcre2-${PCRE2_VERSION}.tar.bz2
+cd pcre2-${PCRE2_VERSION}
+update_title_info
+tar -xvJf /usr/portage/distfiles/libpcre2-${PCRE2_VERSION}-patchset-01.tar.xz
+# Gentoo Patches...
+for patchfile in patches/* ; do
+	# Try to detect if we need p0 or p1...
+	if grep -q 'diff --git' "${patchfile}" ; then
+		echo "Applying ${patchfile} w/ p1 . . ."
+		patch -p1 < ${patchfile}
+	else
+		echo "Applying ${patchfile} w/ p0 . . ."
+		patch -p0 < ${patchfile}
+	fi
+done
+autoreconf -fi
+# Setup our rpath...
+export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-shared=yes --enable-static=no --enable-pcre2-8 --with-match-limit-depth=8192 --enable-pcre2grep-libbz2 --enable-pcre2test-libreadline --enable-pcre2grep-libz --enable-jit --enable-pcre2grep-jit --disable-pcre2-16 --disable-pcre2-32 --enable-unicode
+make ${JOBSFLAGS}
+make install
+cp ../lib/libpcre2-8.so.${PCRE2_SOVER} ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre2-8.so.${PCRE2_SOVER%%.*}
+${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre2-8.so.${PCRE2_SOVER%%.*}
+cp ../lib/libpcre2-posix.so.${PCRE2_POSIX_SOVER} ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre2-posix.so.${PCRE2_POSIX_SOVER%%.*}
+${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/lib/libpcre2-posix.so.${PCRE2_POSIX_SOVER%%.*}
+export LDFLAGS="${BASE_LDFLAGS}"
+
+## less
+echo "* Building less . . ."
+echo ""
+cd ..
+tar -I pigz -xvf /usr/portage/distfiles/less-557.tar.gz
+cd less-557
+update_title_info
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/less-kindle-tweaks.patch
+# Setup our rpath...
+export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
+# Fix userstore path on Kobos...
+if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
+	sed -e "s#/mnt/us#${DEVICE_USERSTORE}#g" -i main.c
+fi
+export ac_cv_lib_ncursesw_initscr=yes
+export ac_cv_lib_ncurses_initscr=no
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-regex=pcre2 --with-editor=nano
+make ${JOBSFLAGS}
+make install
+for my_bin in less lessecho lesskey ; do
+	cp ../bin/${my_bin} ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/${my_bin}
+	${CROSS_TC}-strip --strip-unneeded ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/${my_bin}
+done
+unset ac_cv_lib_ncurses_initscr
+unset ac_cv_lib_ncursesw_initscr
+export LDFLAGS="${BASE_LDFLAGS}"
 
 ## static cURL (7.65.1)
 #
