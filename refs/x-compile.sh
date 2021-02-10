@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 18097 2021-01-26 21:07:35Z NiLuJe $
+# $Id: x-compile.sh 18154 2021-02-10 04:54:55Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -373,6 +373,8 @@ esac
 
 ## NOTE: Reminder of the various stuff I had to install on a fresh Gentoo box...
 #
+# Don't forget the kernel sources for strace...
+#
 # For the packaging scripts:
 #	cave resolve -x lbzip2 pigz
 #	cave resolve dev-perl/File-MimeInfo -x
@@ -381,24 +383,24 @@ esac
 #	cave resolve -x rar
 #	cave resolve p7zip rar python-swiftclient python-keystoneclient
 #
-#	emerge -a lbzip2 pigz dev-perl/File-MimeInfo kindletool svn2cl rar p7zip python-swiftclient python-keystoneclient
+#	emerge -a lbzip2 pigz dev-perl/File-MimeInfo kindletool svn2cl rar p7zip python-swiftclient python-keystoneclient app-text/dos2unix
 #
 # For harfbuzz:
 #	cave resolve -1 ragel gobject-introspection-common -x
 #
-#	emerge -a ragel gobject-introspection-common
+#	emerge -a gobject-introspection-common
 #
 # For OpenSSH & co:
 #	mkdir -p /mnt/onboard/.niluje/usbnet && mkdir -p /mnt/us/usbnet && chown -cvR niluje:users /mnt/us && chown -cvR niluje:users /mnt/onboard
 #
 # For Python:
 #
-#	emerge -a dev-lang/python:2.7 dev-lang/python:3.7
+#	emerge -a dev-lang/python:2.7 dev-lang/python:3.9
 #
 # For Python 3rd party modules:
 #	cave resolve -x distutilscross
 #
-#	emerge -a distutilscross
+#	emerge -a dev-python/distutilscross dev-python/distutilscross:2.7
 #
 # For FC:
 #	cave resolve -x dev-python/lxml (for fontconfig)
@@ -409,15 +411,18 @@ esac
 #	emerge -a dev-lang/tcl
 #
 # For lxml:
-#	emerge -a cython
+#	emerge -a dev-python/cython dev-python/cython:2.7
 #
 # For BeautifulSoup:
-#	emerge -a bzr
+#	emerge -a dev-vcs/breezy
+#
+# For mosh:
+#	emerge -a protobuf
 #
 # To fetch everything:
 #	cave resolve -1 -z -f -x sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb --uninstalls-may-break '*/*'
 #	OR
-#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python:3.8 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb libxml2 libxslt curl pax-utils libpcre2 less dev-vcs/git lftp
+#	emerge -1 -f sys-libs/zlib expat freetype harfbuzz util-linux fontconfig coreutils dropbear rsync busybox dev-libs/openssl:0 openssh ncurses htop lsof protobuf mosh libarchive gmp nettle libpng libjpeg-turbo '<=media-gfx/imagemagick-7' bzip2 dev-libs/libffi sys-libs/readline icu sqlite dev-lang/python:2.7 dev-lang/python:3.9 dev-libs/glib sys-fs/fuse elfutils file nano libpcre zsh mit-krb5 libtirpc xz-utils libevent tmux gdb libxml2 libxslt curl pax-utils libpcre2 less dev-vcs/git lftp app-text/tree
 #
 ##
 
@@ -1297,7 +1302,7 @@ Build_FreeType_Stack() {
 	# Funnily enough, it depends on freetype too...
 	# NOTE: I thought I *might* have to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512,
 	#       but in practice in turns out that wasn't needed ;).
-	FT_VER="2.10.4_p20201214"
+	FT_VER="2.10.4_p20210110"
 	FT_SOVER="6.17.4"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
@@ -1542,7 +1547,7 @@ done
 echo "* Building fontconfig . . ."
 echo ""
 FC_SOVER="1.12.0"
-FC_VER="2.13.93_p20201211"
+FC_VER="2.13.93_p20210120"
 cd ..
 tar -xvJf /usr/portage/distfiles/fontconfig-${FC_VER}.tar.xz
 cd fontconfig
@@ -1689,7 +1694,7 @@ fi
 echo "* Building dropbear . . ."
 echo ""
 cd ..
-DROPBEAR_SNAPSHOT="2020.81_p20201210"
+DROPBEAR_SNAPSHOT="2020.81_p20201217"
 wget http://files.ak-team.com/niluje/gentoo/dropbear-${DROPBEAR_SNAPSHOT}.tar.xz -O dropbear-${DROPBEAR_SNAPSHOT}.tar.xz
 tar -xvJf dropbear-${DROPBEAR_SNAPSHOT}.tar.xz
 cd dropbear
@@ -1887,10 +1892,10 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 
 	# Fancier version tag...
 	sed -e "s/^SUBLEVEL = 0/SUBLEVEL = 99/" -i Makefile
-	sed -e "s/^EXTRAVERSION = .git/EXTRAVERSION = .$(git rev-list --count 1_32_0..)-g$(git rev-parse --short HEAD)/" -i Makefile
+	sed -e "s/^EXTRAVERSION = .git/EXTRAVERSION = .$(git rev-list --count 1_33_0..)-g$(git rev-parse --short HEAD)/" -i Makefile
 else
-	tar -I lbzip2 -xvf /usr/portage/distfiles/busybox-1.32.0.tar.bz2
-	cd busybox-1.32.0
+	tar -I lbzip2 -xvf /usr/portage/distfiles/busybox-1.33.0.tar.bz2
+	cd busybox-1.33.0
 fi
 update_title_info
 # FIXME: Workarounds conflicting typedefs between <unistd.h> and <linux/types.h> because of the terribly old kernel we're using...
@@ -1908,7 +1913,7 @@ export CROSS_COMPILE="${CROSS_TC}-"
 #export CXXFLAGS="${BASE_CFLAGS} -fno-strict-aliasing"
 #patch -p1 < /usr/portage/sys-apps/busybox/files/busybox-1.26.2-bb.patch
 if [[ "${KINDLE_TC}" != "KOBO" ]] ; then
-	for patchfile in /usr/portage/sys-apps/busybox/files/busybox-1.32.0-*.patch ; do
+	for patchfile in /usr/portage/sys-apps/busybox/files/busybox-1.33.0-*.patch ; do
 		[[ -f "${patchfile}" ]] && patch -p1 < ${patchfile}
 	done
 fi
@@ -1926,6 +1931,11 @@ if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.32.0-kobo-modutils.patch
 	# Also make sure login (for telnet) defaults to our own ash
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.31.1-kobo-enforce-ash.patch
+	# FIXME: https://git.busybox.net/busybox/commit/networking/traceroute.c?id=2b94c053d1c2a0db88dbc4e1e470ae17c616ed92 isn't quite right,
+	#        the struct hasn't always been an union on Linux, the BSD bits used to be hidden behind a __FAVOR_BSD define on older glibc versions...
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.34.99-traceroute-build-fix.patch
+	# FIXME: Check is outdated, uses "Linux" instead of the actual string in the config, "GNU/Linux"
+	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.34.99-fix-nslookup-big-build.patch
 fi
 
 make allnoconfig
@@ -2006,9 +2016,9 @@ EOF
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	#cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.31.0-kobo-depmod-config .config
 	# In fact, we've now switched to a fairly complete standalone busybox build, because stuff being randomly broken was starting to piss me off...
-	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.33.99-kobo-standalone-config .config
+	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.34.99-kobo-standalone-config .config
 else
-	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.32.0-config .config
+	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.33.0-config .config
 fi
 make oldconfig
 sleep 5
@@ -2060,7 +2070,7 @@ if [[ "${KINDLE_TC}" == "K5" || "${KINDLE_TC}" == "PW2" ]] ; then
 
 EOF
 	#make menuconfig
-	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.32.0-gandalf-config .config
+	cp -v ${SVN_ROOT}/Configs/trunk/Kindle/Misc/busybox-1.33.0-gandalf-config .config
 	make oldconfig
 	sleep 5
 	make ${JOBSFLAGS} AR="${CROSS_TC}-gcc-ar" RANLIB="${CROSS_TC}-gcc-ranlib" NM="${CROSS_TC}-gcc-nm" V=1
@@ -2293,26 +2303,25 @@ cd ncurses-${NCURSES_SOVER}
 update_title_info
 export CFLAGS="${BASE_CFLAGS}"
 export CXXFLAGS="${BASE_CFLAGS}"
-#bzcat /usr/portage/distfiles/ncurses-6.1-20190609-patch.sh.bz2 > ncurses-6.1-20190609-patch.sh
-#sh ncurses-6.1-20190609-patch.sh
+xzcat /usr/portage/distfiles/ncurses-6.2_p20210123.patch.xz > ncurses-6.2_p20210123.patch
+patch -p1 < ./ncurses-6.2_p20210123.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.7-nongnu.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-rxvt-unicode-9.15.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-pkg-config.patch
-patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-5.9-gcc-5.patch
 patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-ticlib.patch
-patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.0-cppflags-cross.patch
-patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.2-no_user_ldflags_in_libs.patch
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.2_p20210123-cppflags-cross.patch
+patch -p1 < /usr/portage/sys-libs/ncurses/files/ncurses-6.2_p20210123-no_user_ldflags_in_libs.patch
 unset TERMINFO
 export CPPFLAGS="${BASE_CPPFLAGS} -D_GNU_SOURCE"
 # NOTE: cross-compile fun times, build tic for our host, in case we're not running the same ncurses version...
 export CBUILD="$(uname -m)-pc-linux-gnu"
 mkdir -p ${CBUILD}
 cd ${CBUILD}
-env CHOST=${CBUILD} CFLAGS="-O2 -pipe -march=native" CXXFLAGS="-O2 -pipe -march=native" LDFLAGS="-Wl,--as-needed -static" CPPFLAGS="-D_GNU_SOURCE" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../configure --{build,host}=${CBUILD} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-term-driver --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant --with-termlib --disable-stripping --without-shared --with-normal
+env CHOST=${CBUILD} CFLAGS="-O2 -pipe -march=native" CXXFLAGS="-O2 -pipe -march=native" LDFLAGS="-Wl,--as-needed -static" CPPFLAGS="-D_GNU_SOURCE" CC="gcc" CXX="g++" AR="ar" RANLIB="ranlib" NM="nm" LD="ld" ../configure --{build,host}=${CBUILD} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-term-driver --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant --with-termlib --disable-stripping --disable-pkg-ldflags --without-shared --with-normal
 # NOTE: use our host's tic
 export TIC_PATH="${TC_BUILD_DIR}/ncurses-${NCURSES_SOVER}/${CBUILD}/progs/tic"
 cd ..
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-term-driver --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant --with-termlib --disable-stripping
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --with-terminfo-dirs="${DEVICE_USERSTORE}/usbnet/etc/terminfo:/etc/terminfo:/usr/share/terminfo" --with-pkg-config-libdir="${TC_BUILD_DIR}/lib/pkgconfig" --enable-pc-files --with-shared --without-hashed-db --without-ada --without-cxx --without-cxx-binding --without-debug --without-profile --without-gpm --disable-term-driver --disable-termcap --enable-symlinks --with-rcs-ids --with-manpage-format=normal --enable-const --enable-colorfgbg --enable-hard-tabs --enable-echo --with-progs --disable-widec --without-pthread --without-reentrant --with-termlib --disable-stripping --disable-pkg-ldflags
 # NOTE: Build our hosts's tic
 cd ${CBUILD}
 make -j1 sources
@@ -2395,9 +2404,6 @@ until git clone --depth 1 https://github.com/htop-dev/htop.git htop ; do
 done
 cd htop
 update_title_info
-# Only actually use O_PATH if running on Linux >= 3.12.0, otherwise, we risk breakage because htop uses fstat on an O_PATH fd,
-# and that's broken in the from Linux 2.6.39 to Linux 3.6, and that happens to be a range in which a lot of our target devices fall...
-patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-3.0.5-runtime_o_path-check.patch
 # Let GCC use its own default standard (i.e., GNU11), and build w/ _GNU_SOURCE defined to play nice with our older glibcs
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-3.0.3-unbreak-build.patch
 # NOTE: Used to fail to build w/ LTO (ICE)... (K5 TC, Linaro GCC 5.2 2015.09 & binutils 2.25.1)
@@ -2405,7 +2411,11 @@ patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-3.0.3-unbreak-build.patch
 #	temp_nolto="true"
 #	export CFLAGS="${NOLTO_CFLAGS}"
 #fi
+# Enforce TERMINFO & HTOPRC to our custom paths
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-3.0.3-kindle-tweaks.patch
+# Only actually use O_PATH if running on Linux >= 3.12.0, otherwise, we risk breakage because htop uses fstat on an O_PATH fd,
+# and that's broken in the from Linux 2.6.39 to Linux 3.6, and that happens to be a range in which a lot of our target devices fall...
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/htop-3.0.5-runtime_o_path-check.patch
 # Kobo doesn't ship ncurses... Some Kindles don't ship ncursesw either, so always use our own.
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
 # Fix userstore path on Kobos...
@@ -2532,17 +2542,19 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.5.0_p20201213.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.5.1_p20201226.tar.xz
 cd libarchive
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
 # Kill -Werror, git master doesn't always build with it...
 sed -e 's/-Werror //' -i ./Makefile.am
+# Only actually use O_PATH if running on Linux >= 3.12.0
+patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/libarchive-runtime_o_path-check.patch
 ./build/autogen.sh
 export ac_cv_header_ext2fs_ext2_fs_h=0
 # We now ship our own shared zlib, so let's use it
 export LDFLAGS="${BASE_LDFLAGS} -Wl,-rpath=${DEVICE_USERSTORE}/usbnet/lib"
-./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --disable-xattr --disable-acl --with-zlib --without-libb2 --without-bz2lib --without-lzmadec --without-iconv --without-lzma --without-nettle --without-openssl --without-expat --without-xml2 --without-lz4 --without-zstd
+./configure --prefix=${TC_BUILD_DIR} --host=${CROSS_TC} --enable-static --disable-shared --disable-xattr --disable-acl --with-zlib --without-libb2 --without-bz2lib --without-iconv --without-lzma --without-nettle --without-openssl --without-expat --without-xml2 --without-lz4 --without-zstd
 make ${JOBSFLAGS} V=1
 make install
 export CFLAGS="${BASE_CFLAGS}"
@@ -2735,8 +2747,8 @@ IM_SOVER="6.0.0"
 cd ..
 # FWIW, you can pretty much use the same configure line for GraphicsMagick, although the ScreenSavers hack won't work with it.
 # It doesn't appear to need the quantize patch though, it consumes a 'normal' amount of memory by default.
-tar xvJf /usr/portage/distfiles/ImageMagick-6.9.11-48.tar.xz
-cd ImageMagick-6.9.11-48
+tar xvJf /usr/portage/distfiles/ImageMagick-6.9.11-61.tar.xz
+cd ImageMagick-6.9.11-61
 update_title_info
 # Use the same codepath as on iPhone devices to nerf the 65MB alloc of the dither code... (We also use a quantum-depth of 8 to keep the memory usage down)
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/ImageMagick-6.8.6-5-nerf-dither-mem-alloc.patch
@@ -2860,8 +2872,8 @@ fi
 ## Readline for SQLite & Python
 echo "* Building Readline . . ."
 echo ""
-READLINE_SOVER="8.0"
-READLINE_PATCHLVL="4"
+READLINE_SOVER="8.1"
+READLINE_PATCHLVL="0"
 cd ..
 tar -I pigz -xvf /usr/portage/distfiles/readline-${READLINE_SOVER}.tar.gz
 cd readline-${READLINE_SOVER}
@@ -2874,6 +2886,7 @@ patch -p1 < /usr/portage/sys-libs/readline/files/readline-5.0-no_rpath.patch
 patch -p1 < /usr/portage/sys-libs/readline/files/readline-6.2-rlfe-tgoto.patch
 patch -p1 < /usr/portage/sys-libs/readline/files/readline-7.0-headers.patch
 patch -p1 < /usr/portage/sys-libs/readline/files/readline-8.0-headers.patch
+patch -p1 < /usr/portage/sys-libs/readline/files/readline-8.0-darwin-shlib-versioning.patch
 # LTO makefile compat...
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/readline-fix-Makefile-for-lto.patch
 ncurses_libs="$(pkg-config ncursesw --libs)"
@@ -2920,7 +2933,7 @@ echo ""
 SQLITE_SOVER="0.8.6"
 SQLITE_VER="3340100"
 cd ..
-wget https://sqlite.org/2020/sqlite-src-${SQLITE_VER}.zip -O sqlite-src-${SQLITE_VER}.zip
+wget https://sqlite.org/2021/sqlite-src-${SQLITE_VER}.zip -O sqlite-src-${SQLITE_VER}.zip
 unzip sqlite-src-${SQLITE_VER}.zip
 cd sqlite-src-${SQLITE_VER}
 update_title_info
@@ -3324,10 +3337,10 @@ cd ..
 # env PYTHONPATH="${TC_BUILD_DIR}/Python-${PYTHON_CUR_VER}/${CROSS_TC}/hostpythonpath" ../Python-${PYTHON_CUR_VER}/${CROSS_TC}/hostpython
 ## HTTPie's plugin system requires pkg_resources, which is part of setuptools...
 ## The Py3-way of doing cross-compilation *may* also need it...
-SETUPTOOLS_VER="51.0.0"
+SETUPTOOLS_VER="52.0.0"
 rm -rf setuptools-${SETUPTOOLS_VER}
-wget https://pypi.python.org/packages/source/s/setuptools/setuptools-${SETUPTOOLS_VER}.zip -O setuptools-${SETUPTOOLS_VER}.zip
-unzip setuptools-${SETUPTOOLS_VER}.zip
+wget https://pypi.python.org/packages/source/s/setuptools/setuptools-${SETUPTOOLS_VER}.tar.gz -O setuptools-${SETUPTOOLS_VER}.tar.gz
+tar -I pigz -xvf setuptools-${SETUPTOOLS_VER}.tar.gz
 cd setuptools-${SETUPTOOLS_VER}
 update_title_info
 for py_ver in ${PYTHON_VERSIONS} ; do
@@ -3546,7 +3559,9 @@ done
 cd ..
 ## CFFI
 rm -rf cffi
-until hg clone ssh://hg@foss.heptapod.net/pypy/cffi ; do
+# NOTE: Use the official GitHub mirror, because the dev repo requires authentication
+#until hg clone ssh://hg@foss.heptapod.net/pypy/cffi ; do
+until git clone --depth 1 https://github.com/arigo/cffi-mirror.git cffi ; do
 	rm -rf cffi
 	sleep 15
 done
@@ -4511,8 +4526,8 @@ export CXXFLAGS="${BASE_CFLAGS}"
 echo "* Building fuse . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/fuse-3.10.1.tar.xz
-cd fuse-3.10.1
+tar -xvJf /usr/portage/distfiles/fuse-3.10.2.tar.xz
+cd fuse-3.10.2
 update_title_info
 
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
@@ -4870,15 +4885,14 @@ cp ../bin/strace ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/strace
 echo "* Building elfutils . . ."
 echo ""
 cd ..
-ELFUTILS_VERSION="0.182"
+ELFUTILS_VERSION="0.183"
 tar -I lbzip2 -xvf /usr/portage/distfiles/elfutils-${ELFUTILS_VERSION}.tar.bz2
 cd elfutils-${ELFUTILS_VERSION}
 update_title_info
 patch -p1 < /usr/portage/dev-libs/elfutils/files/elfutils-0.175-disable-biarch-test-PR24158.patch
 patch -p1 < /usr/portage/dev-libs/elfutils/files/elfutils-0.177-disable-large.patch
 patch -p1 < /usr/portage/dev-libs/elfutils/files/elfutils-0.180-PaX-support.patch
-patch -p1 < /usr/portage/dev-libs/elfutils/files/elfutils-0.179-CC-in-tests.patch
-patch -p1 < /usr/portage/dev-libs/elfutils/files/elfutils-0.181-CC-in-tests-p2.patch
+patch -p1 < /usr/portage/dev-libs/elfutils/files/elfutils-0.183-CC-quote.patch
 #sed -i -e '/^lib_LIBRARIES/s:=.*:=:' -e '/^%.os/s:%.o$::' lib{asm,dw,elf}/Makefile.in
 sed -i 's:-Werror::' configure.ac configure */Makefile.in config/eu.am
 # aligned_alloc was standardized in C11, and we know our compilers are recent enough to accept that (in fact, that's their default std value for C)
@@ -5327,7 +5341,7 @@ for my_gdb_script in gcore gdb-add-index ; do
 done
 
 ## Binutils (for objdump, since elfutils' doesn't support arm)
-BINUTILS_SOVER="2.36.0"
+BINUTILS_SOVER="2.36.1"
 echo "* Building Binutils . . ."
 echo ""
 cd ..
@@ -5458,8 +5472,8 @@ export LDFLAGS="${BASE_LDFLAGS}"
 echo "* Building pax-utils . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/pax-utils-1.2.6.tar.xz
-cd pax-utils-1.2.6
+tar -xvJf /usr/portage/distfiles/pax-utils-1.2.9.tar.xz
+cd pax-utils-1.2.9
 update_title_info
 # NOTE: We don't have bash, but we do have ZSH ;).
 sed -e 's%^#!/bin/bash%#!/usr/bin/env zsh%' -i symtree.sh
@@ -5771,7 +5785,7 @@ cp mobicover ${BASE_HACKDIR}/ScreenSavers/src/linkss/bin/mobicover
 export LDFLAGS="${BASE_LDFLAGS}"
 export CFLAGS="${BASE_CFLAGS}"
 
-## MobiCover
+## LFTP
 echo "* Building LFTP . . ."
 echo ""
 cd ..
@@ -5811,6 +5825,17 @@ cp lftp.conf ${BASE_HACKDIR}/USBNetwork/src/usbnet/etc/lftp/lftp.conf
 export LDFLAGS="${BASE_LDFLAGS}"
 export CFLAGS="${BASE_CFLAGS}"
 
+## Tree
+echo "* Building tree . . ."
+echo ""
+cd ..
+tar -I pigz -xvf /usr/portage/distfiles/tree-1.8.0.tar.gz
+cd tree-1.8.0
+update_title_info
+sed -i -e 's:LINUX:__linux__:' tree.c
+make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" CFLAGS="${CPPFLAGS} ${CFLAGS}" LDFLAGS="${LDFLAGS}"
+${CROSS_TC}-strip --strip-unneeded tree
+cp tree ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/tree
 
 ## static cURL (7.65.1)
 #
