@@ -150,9 +150,11 @@ case $1 in
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
+		# NOTE: Don't swap away from the 1.23-kindle branch,
+		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			9954e26ad2a0781a12f0066411bc5ee5cd8b2829 \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
