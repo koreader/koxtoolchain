@@ -108,25 +108,25 @@ case $1 in
 	kobo)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -140,19 +140,19 @@ case $1 in
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
@@ -195,7 +195,7 @@ case $1 in
 	bookeen)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a47a97484946e95fcfe9189e077a6dfcc107d667 \
+			d9c3480aee12e0e9cc6f4e0a0f82e8ebef97824f \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
