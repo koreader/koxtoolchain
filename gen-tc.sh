@@ -108,25 +108,25 @@ case $1 in
 	kobo)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -140,13 +140,13 @@ case $1 in
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
@@ -197,7 +197,7 @@ case $1 in
 	bookeen)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d0876da0ea838f18072b124b4d14cefe4a32102f \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)

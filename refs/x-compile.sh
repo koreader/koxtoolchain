@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 18493 2021-05-16 00:42:24Z NiLuJe $
+# $Id: x-compile.sh 18495 2021-05-16 15:47:28Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -126,7 +126,7 @@ Build_CT-NG-Legacy() {
 	unset CFLAGS CXXFLAGS LDFLAGS
 
 	## And then build every TC one after the other...
-	for my_tc in kindle ; do
+	for my_tc in kindle pocketbook ; do
 		echo ""
 		echo "* Building the ${my_tc} ToolChain . . ."
 		echo ""
@@ -218,8 +218,8 @@ Build_CT-NG() {
 	unset CFLAGS CXXFLAGS LDFLAGS
 
 	## And then build every TC one after the other...
-	## FIXME: kindle is broken in the 1.24 branch (The pass-2 core C gcc compiler fails to build libgcc with a multiple definition of `__libc_use_alloca' link failure), for some reason...
-	for my_tc in kindle5 kindlepw2 kobo remarkable pocketbook bookeen cervantes ; do
+	## FIXME: kindle & pocketbook are broken in the 1.24 branch (The pass-2 core C gcc compiler fails to build libgcc with a multiple definition of `__libc_use_alloca' link failure), for some reason (they both use the same ridiculously old glibc version)...
+	for my_tc in kindle5 kindlepw2 kobo remarkable bookeen cervantes ; do
 		echo ""
 		echo "* Building the ${my_tc} ToolChain . . ."
 		echo ""
@@ -1135,6 +1135,7 @@ if [[ "${2}" == "env" ]] ; then
 		#       c.f., x-clang-compiler-rt.sh to build compiler-rt in the first place ;).
 		# NOTE: Don't run it blindly, though, as it's experimental, tailored to Gentoo, and (minimally) affects the host's rootfs!
 		# NOTE: For C++, the general idea would be the same to swap to libunwind/libc++ via --stdlib=libc++ instead of libgcc_s/libstdc++ ;).
+		#       An annoying caveat is that llvm-libunwind/libcxxabi/libcxx live in standard library search paths, not custom LLVM ones, unlike compiler-rt... :/ (i.e., we'd probably have to move 'em to the TC's sysroot or a staging one).
 		# NOTE: c.f., https://archive.fosdem.org/2018/schedule/event/crosscompile/attachments/slides/2107/export/events/attachments/crosscompile/slides/2107/How_to_cross_compile_with_LLVM_based_tools.pdf for a good recap.
 		if [[ "${3}" == "clang-gcc" ]] ; then
 			export CFLAGS="--target=${CROSS_TC} --sysroot=$(${CROSS_TC}-gcc -print-sysroot) --gcc-toolchain=${HOME}/x-tools/${CROSS_TC} ${RICE_CFLAGS}"
