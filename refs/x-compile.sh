@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 18495 2021-05-16 15:47:28Z NiLuJe $
+# $Id: x-compile.sh 18506 2021-05-16 22:49:14Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -204,7 +204,8 @@ Build_CT-NG() {
 	#              The good news is all the work involved in moving to ct-ng 1.24 is done, and building Linaro 7.4 also works there, FWIW.
 	# NOTE: A quick test w/ GCC 10.1 shows slightly more encouraging results...
 	#       PNG decoding w/ stb_image still takes a severe performance hit, but other things are faring better.
-	# NOTE: With the release of GCC 11.1, GCC 7 is now EoL, so, just move to GCC 11.1 and call it a day. (Things *are* admittedly a bit better than GCC 10).
+	# NOTE: With the release of GCC 11.1, GCC 7 is now *very* EoL, so, just move to GCC 11.1 and call it a day.
+	#       Things *are* admittedly a bit better than GCC 10 still, and, as far as stbi is concerned, switching away from Thumb mode does yield better performance (obviously at the expense of larger binaries).
 	# XXX: https://github.com/NiLuJe/crosstool-ng/commit/90c619fe156f997dfe8ec21bb316901ecd264efc
 	#       was an ill-advised attempt to preserve the full set of computed *FLAGS during GCC's build, but it's problematic with -mcpu builds,
 	#       because libatomic's build may set -march and this trips a warning when mixed w/ -mcpu on ARM, and that warning is fatal because -Werror...
@@ -715,6 +716,7 @@ case ${KINDLE_TC} in
 			##       https://gcc.gnu.org/git?p=gcc.git;a=commit;h=3b91aab15443ee150b2ba314a4b26645ce8d713b (e.g., https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80155).
 			##       If we wanted to mimic that, since we actually build against FSF GCC, we could disable code-hoisting here. Doesn't really seem to help us in practice though, so, eh.
 			#ARCH_FLAGS="${ARCH_FLAGS} -fno-code-hoisting"
+			## NOTE: As for defaulting to Thumb mode, that's consistent with Linaro's default armv7 configs.
 		else
 			ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
 		fi
@@ -910,7 +912,7 @@ case ${KINDLE_TC} in
 	;;
 	PB )
 		# NOTE: The TC itself is built in ARM mode, otherwise glibc 2.9 doesn't build (fails with a "r15 not allowed here" assembler error on csu/libc-start.o during the early multilib start-files step).
-		#       AFAICT, the official SDK doesn't make a specific choice on that front (i.e., it passes neither -marm not -mthumb)...
+		#       AFAICT, the official SDK doesn't make a specific choice on that front (i.e., it passes neither -marm not -mthumb. That usually means ARM)...
 		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp -mthumb"
 		CROSS_TC="arm-pocketbook-linux-gnueabi"
 		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
@@ -1246,6 +1248,8 @@ if [[ "${USE_ZLIB_NG}" == "true" ]] ; then
 	# NOTE: We CANNOT support runtime HWCAP checks, because we mostly don't have access to getauxval (c.f., comments around OpenSSL for more details).
 	#       On the other hand, we don't need 'em: we know the exact target we're running on.
 	#       So switch back to compile-time checks.
+	# NOTE: We also nerf https://github.com/zlib-ng/zlib-ng/commit/461c2796c262885593a40ae1acd2c195b300adc7,
+	#       because this ensures that we can, in fact, use LTO, as everything becomes a compile-time check.
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-ng-nerf-arm-hwcap.patch
 	# NOTE: This (https://github.com/zlib-ng/zlib-ng/commit/b82d3497a5afc46dec3c5d07e4b163b169f251d7) actually *broke* hardfp detection in the configure script.
 	patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-ng-fix-arm-float-detection.diff
@@ -1261,7 +1265,7 @@ if [[ "${USE_ZLIB_NG}" == "true" ]] ; then
 	#       here, at its widest, that's an int32x4, and we're on 32-bit,
 	#       so unaligned accesses like that are supported on the A8 & A9.
 	#       c.f., table A3-1 in ARM DDI 0406C
-	# NOTE: I can reproduce similar code generation on Clang 11, but not with GCC 7.5, 10.3.
+	# NOTE: I can reproduce similar code generation on Clang 11, but not with GCC 7.5, 10.3, 11.1.
 	patch -p1 -R < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/zlib-ng-pr927.diff
 	export CFLAGS="${RICE_CFLAGS}"
 	if [[ "${KINDLE_TC}" == "K3" ]] ; then
@@ -1324,7 +1328,7 @@ Build_FreeType_Stack() {
 	# Funnily enough, it depends on freetype too...
 	# NOTE: I thought I *might* have to disable TT_CONFIG_OPTION_COLOR_LAYERS in snapshots released after 2.9.1_p20180512,
 	#       but in practice in turns out that wasn't needed ;).
-	FT_VER="2.10.4_p20210410"
+	FT_VER="2.10.4_p20210513"
 	FT_SOVER="6.17.4"
 	echo "* Building freetype (for harfbuzz) . . ."
 	echo ""
@@ -1724,7 +1728,7 @@ fi
 echo "* Building dropbear . . ."
 echo ""
 cd ..
-DROPBEAR_SNAPSHOT="2020.81_p20210331"
+DROPBEAR_SNAPSHOT="2020.81_p20210501"
 wget http://files.ak-team.com/niluje/gentoo/dropbear-${DROPBEAR_SNAPSHOT}.tar.xz -O dropbear-${DROPBEAR_SNAPSHOT}.tar.xz
 tar -xvJf dropbear-${DROPBEAR_SNAPSHOT}.tar.xz
 cd dropbear
@@ -2569,7 +2573,7 @@ cp ../bin/mosh-client ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/mosh-client
 echo "* Building libarchive . . ."
 echo ""
 cd ..
-tar -xvJf /usr/portage/distfiles/libarchive-3.5.1_p20210405.tar.xz
+tar -xvJf /usr/portage/distfiles/libarchive-3.5.1_p20210508.tar.xz
 cd libarchive
 update_title_info
 export CFLAGS="${RICE_CFLAGS}"
@@ -3074,9 +3078,11 @@ cd ..
 tar -I pigz -xvf /usr/portage/distfiles/libxml2-${LIBXML2_VERSION}.tar.gz
 cd libxml2-${LIBXML2_VERSION}
 update_title_info
-tar -xvJf /usr/portage/distfiles/libxml2-${LIBXML2_VERSION}-r1-patchset.tar.xz
 # Gentoo Patches...
 for patchfile in patches/* ; do
+	if [[ ! -f "${patchfile}" ]] ; then
+		continue
+	fi
 	# Skip the funky dummy tarball
 	if [[ "${patchfile}" == *.tar ]] ; then
 		continue
@@ -3796,6 +3802,8 @@ cd cryptography-${CRYPTOGRAPHY_VER}
 update_title_info
 export CRYPTOGRAPHY_DONT_BUILD_RUST=1
 sed -e 's:from setuptools_rust import RustExtension:pass:' -e '/setup_requires/d' -i setup.py
+# Gentoo patchset
+patch -p1 < /usr/portage/dev-python/cryptography/files/cryptography-3.4.7-py310.patch
 #env CC="${CROSS_TC}-gcc" LDSHARED="${CROSS_TC}-gcc -shared" CFLAGS="${BASE_CFLAGS} -I${TC_BUILD_DIR}/python/include/python2.7" LDFLAGS="${BASE_LDFLAGS} -L${TC_BUILD_DIR}/python/lib -L${TC_BUILD_DIR}/python/usr/lib -L${HOME}/x-tools/${CROSS_TC}/${CROSS_TC}/sysroot/usr/lib -Wl,-rpath=${DEVICE_USERSTORE}/python/lib" python2.7 setup.py install --root=${TC_BUILD_DIR}/python --prefix=. --no-compile
 # NOTE: We need to link against pthreads, and distutils is terrible.
 for py_ver in ${PYTHON_VERSIONS} ; do
@@ -5732,8 +5740,8 @@ export LDFLAGS="${BASE_LDFLAGS}"
 echo "* Building less . . ."
 echo ""
 cd ..
-tar -I pigz -xvf /usr/portage/distfiles/less-581.2.tar.gz
-cd less-581.2
+tar -I pigz -xvf /usr/portage/distfiles/less-586.tar.gz
+cd less-586
 update_title_info
 patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/less-kindle-tweaks.patch
 # Setup our rpath...
