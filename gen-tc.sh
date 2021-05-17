@@ -48,7 +48,7 @@ Build_CT-NG() {
 			./configure --prefix="${BUILD_ROOT}/CT_NG_BUILD"
 			make -j${PARALLEL_JOBS}
 			make install
-			export PATH="${PATH}:${BUILD_ROOT}/CT_NG_BUILD/bin"
+			export PATH="${BUILD_ROOT}/CT_NG_BUILD/bin:${PATH}"
 		popd
 		# extract platform name from target tuple
 		tmp_str="${tc_target#*-}"
@@ -60,6 +60,7 @@ Build_CT-NG() {
 			unset CFLAGS CXXFLAGS LDFLAGS
 			ct-ng "${tc_target}"
 			ct-ng oldconfig
+			ct-ng upgradeconfig
 			ct-ng updatetools
 			nice ct-ng build
 			echo ""
@@ -105,28 +106,27 @@ case $1 in
 		exit 0
 		;;
 	kobo)
-		# NOTE: See x-compile.sh for why we're staying away from GCC 8 & 9 for now (TL;DR: neon perf regressions).
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -134,25 +134,27 @@ case $1 in
 		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			9954e26ad2a0781a12f0066411bc5ee5cd8b2829 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
+		# NOTE: Don't swap away from the 1.23-kindle branch,
+		#       this TC currently fails to build on 1.24-kindle...
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			9954e26ad2a0781a12f0066411bc5ee5cd8b2829 \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
@@ -195,7 +197,7 @@ case $1 in
 	bookeen)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			23ba174c7ebdefc09dc610286c92619c610e4d27 \
+			31a4243e5ee31021eeaf968417c7c333a8a7ca26 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
