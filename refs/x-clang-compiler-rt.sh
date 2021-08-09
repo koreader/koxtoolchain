@@ -2,7 +2,7 @@
 #
 # Companion script to x-compile compiler-rt for Clang experiments
 #
-# $Id: x-clang-compiler-rt.sh 18449 2021-04-16 23:27:12Z NiLuJe $
+# $Id: x-clang-compiler-rt.sh 18643 2021-07-09 22:43:16Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -29,7 +29,7 @@ mkdir -p "${TC_BUILD_DIR}"
 cd "${TC_BUILD_DIR}"
 
 # c.f., https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
-CLANG_VERSION="12.0.0"
+CLANG_VERSION="12.0.1"
 tar -I pigz -xvf /usr/portage/distfiles/llvmorg-${CLANG_VERSION}.tar.gz
 cd llvm-project-llvmorg-${CLANG_VERSION}/compiler-rt
 mkdir build
