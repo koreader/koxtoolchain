@@ -5,22 +5,24 @@ Build scripts to help generate cross ToolChains for various platforms supported 
 
 ## Dependencies
 
+* ncurses
 * gperf
 * help2man
 * bison
 * texinfo
 * flex
 * gawk
+* unzip
 
 ## For Arch users:
 ```bash
-sudo pacman -S base-devel gperf help2man bison texinfo flex gawk
+sudo pacman -S base-devel gperf help2man bison texinfo flex gawk unzip
 ```
 
 ## For Debian/Ubuntu users:
 
 ```bash
-sudo apt-get install build-essential gperf help2man bison texinfo flex gawk autoconf automake wget curl file libncurses-dev
+sudo apt-get install build-essential gperf help2man bison texinfo flex gawk autoconf automake wget curl file libncurses-dev unzip
 ```
 
 ## Usage
