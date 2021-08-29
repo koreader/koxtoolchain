@@ -17,13 +17,13 @@ Build scripts to help generate cross ToolChains for various platforms supported 
 
 ## For Arch users:
 ```bash
-sudo pacman -S base-devel git gperf help2man bison texinfo flex gawk unzip
+sudo pacman -S base-devel curl git gperf help2man unzip wget
 ```
 
 ## For Debian/Ubuntu users:
 
 ```bash
-sudo apt-get install build-essential git gperf help2man bison texinfo flex gawk autoconf automake wget curl file libncurses-dev unzip libtool libtool-bin
+sudo apt-get install build-essential autoconf automake bison flex gawk libtool libtool-bin libncurses-dev curl file git gperf help2man texinfo unzip wget
 ```
 
 ## Usage
