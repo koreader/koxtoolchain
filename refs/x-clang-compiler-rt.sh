@@ -2,7 +2,7 @@
 #
 # Companion script to x-compile compiler-rt for Clang experiments
 #
-# $Id: x-clang-compiler-rt.sh 18643 2021-07-09 22:43:16Z NiLuJe $
+# $Id: x-clang-compiler-rt.sh 19004 2022-12-25 17:22:43Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -29,9 +29,14 @@ mkdir -p "${TC_BUILD_DIR}"
 cd "${TC_BUILD_DIR}"
 
 # c.f., https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
-CLANG_VERSION="12.0.1"
-tar -I pigz -xvf /usr/portage/distfiles/llvmorg-${CLANG_VERSION}.tar.gz
-cd llvm-project-llvmorg-${CLANG_VERSION}/compiler-rt
+CLANG_VERSION="15.0.6"
+tar xvJf /usr/portage/distfiles/llvm-project-${CLANG_VERSION}.src.tar.xz
+cd llvm-project-${CLANG_VERSION}.src
+tar xvJf /usr/portage/distfiles/llvm-gentoo-patchset-${CLANG_VERSION}.tar.xz
+for patch in llvm-gentoo-patchset-15.0.6/* ; do
+	patch -p1 < "${patch}"
+done
+cd compiler-rt
 mkdir build
 cd build
 # NOTE: Install path is the *live* Clang installation from the host (Gentoo paths)!
@@ -45,6 +50,7 @@ cmake .. -G Ninja \
 	-DCOMPILER_RT_BUILD_XRAY=OFF \
 	-DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
 	-DCOMPILER_RT_BUILD_MEMPROF=OFF \
+	-DCOMPILER_RT_BUILD_ORC=OFF \
 	-DCOMPILER_RT_BUILD_PROFILE=OFF \
 	-DCMAKE_C_COMPILER=$(command -v clang) \
 	-DCMAKE_AR=$(command -v llvm-ar) \
