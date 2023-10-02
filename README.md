@@ -45,6 +45,13 @@ For example, for a Kobo TC:
 source refs/x-compile.sh kobo env
 ```
 
+## Container image
+
+You can also use a container image to work with the toolchain. You can pull a Kobo image from the [GitHub Container Registry](https://ghcr.io/cam-rod/koxtoolchain).
+
+Alternatively, compile a toolchain for any supported target using the [buildah-koxtoolchain.sh script](./buildah-koxtoolchain.sh).
+You'll need to install [Buildah](https://buildah.io/). Instructions for building a new image can be printed with the `-h` option.
+
 ## Notes
 
 Due to a whole lot of legacy baggage, the names of the various Kindle TCs may be slightly confusing (especially compared to KOReader's target names), so, let's disambiguate that:
