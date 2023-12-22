@@ -133,10 +133,15 @@ case $1 in
 	kindle)
 		# NOTE: Don't swap away from the 1.23-kindle branch,
 		#       this TC currently fails to build on 1.24-kindle...
+
+		# NOTE: Prevent libstdc++ from pulling in utimensat@GLIBC_2.6
+		export glibcxx_cv_utimensat=no
+
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			d37d41bb205186cb38516445b2f1f502685cd77b \
 			"arm-${1}-linux-gnueabi"
+		unset glibcxx_cv_utimensat
 		;;
 	remarkable)
 		Build_CT-NG \
@@ -153,6 +158,10 @@ case $1 in
 	pocketbook)
 		# NOTE: Don't swap away from the 1.23-kindle branch,
 		#       this TC currently fails to build on 1.24-kindle...
+
+		# NOTE: Prevent libstdc++ from pulling in utimensat@GLIBC_2.6
+		export glibcxx_cv_utimensat=no
+
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
 			d37d41bb205186cb38516445b2f1f502685cd77b \
@@ -194,6 +203,8 @@ case $1 in
 			-O "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
 		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include/bookstate.h"
 		chmod a-w "${HOME}/x-tools/arm-${1}-linux-gnueabi/arm-${1}-linux-gnueabi/sysroot/usr/include"
+
+		unset glibcxx_cv_utimensat
 		;;
 	bookeen)
 		Build_CT-NG \
