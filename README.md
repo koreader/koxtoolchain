@@ -47,10 +47,22 @@ source refs/x-compile.sh kobo env
 
 ## Container image
 
-You can also use a container image to work with the toolchain. You can pull a Kobo image from the [GitHub Container Registry](https://ghcr.io/cam-rod/koxtoolchain).
+You can also use a container with the precompiled toolchain. Pull the relevant image from the [GitHub Container Registry](https://ghcr.io/cam-rod/koxtoolchain). Alternatively, build the image locally using the [source script](./buildah-koxtoolchain.sh) (requires [Buildah](https://buildah.io/), run `./buildah-koxtoolchain.sh -h` for instructions).
 
-Alternatively, compile a toolchain for any supported target using the [buildah-koxtoolchain.sh script](./buildah-koxtoolchain.sh).
-You'll need to install [Buildah](https://buildah.io/). Instructions for building a new image can be printed with the `-h` option.
+To use the containerized toolchain (for example, Kobo):
+
+```bash
+podman pull ghcr.io/cam-rod/koxtoolchain:kobo-latest
+podman run --rm -it -v /home/user/src-folder:/home/kox/build \
+  koxtoolchain:kobo-latest <build_command>
+```
+
+For systems with SELinux enforcing (ex. Fedora), use this command instead:
+
+```bash
+podman run --rm -it -v /home/user/src-folder:/home/kox/build:z \
+  koxtoolchain:kobo-latest <build_command>
+```
 
 ## Notes
 
