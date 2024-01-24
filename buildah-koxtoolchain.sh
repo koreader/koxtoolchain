@@ -32,12 +32,14 @@ buildah run -e DEBIAN_FRONTEND=noninteractive "$kox_builder" -- apt-get -y insta
 
 # Create kox user (password: kox)
 buildah run "$kox_builder" -- useradd -G sudo kox
-buildah run "$kox_builder" -- bash -c 'echo kox | passwd --stdin kox'
-buildah config -u kox --workingdir /home/kox --entrypoint /bin/bash "$kox_builder"
-buildah run "$kox_builder" -- mkdir build
+buildah run "$kox_builder" -- bash -c 'echo "kox:kox" | chpasswd'
+buildah run "$kox_builder" -- mkdir -p /home/kox/build
+buildah config --workingdir /home/kox --entrypoint /bin/bash "$kox_builder"
 
 # Compile and install koxtoolchain
 buildah run "$kox_builder" -- git clone -b "$KOX_VERSION" "https://github.com/koreader/koxtoolchain.git" koxtoolchain
+buildah run "$kox_builder" -- chown -R kox:kox /home/kox
+buildah config -u kox "$kox_builder" 
 buildah run --workingdir /home/kox/koxtoolchain "$kox_builder" -- bash ./gen-tc.sh "$TARGET"
 # shellcheck disable=SC2016
 buildah run -e "TARGET=$TARGET" "$kox_builder" -- bash -c \
@@ -45,16 +47,17 @@ buildah run -e "TARGET=$TARGET" "$kox_builder" -- bash -c \
 buildah run "$kox_builder" -- bash -c 'echo ". .bashrc" >> .bash_profile'
 buildah run "$kox_builder" -- rm -rf /home/kox/koxtoolchain/build/
 
-# Image configuration for GHCR
+# Image configuration for GHCR, set working directory
 buildah config -a org.opencontainers.image.authors='Cameron Rodriguez <dev@camrod.me>' \
     -a org.opencontainers.image.title="koxtoolchain container" \
-    -a org.opencontainers.image.description="Container image for KOReader cross-compile toolchain - $TARGET" \
+    -a org.opencontainers.image.description="Container image for KOReader cross-compile toolchain" \
     -a org.opencontainers.image.version="$KOX_VERSION" \
     -a org.opencontainers.image.source="https://github.com/cam-rod/koxtoolchain/tree/container" \
     -a org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+    --workingdir /home/kox/build \
     "$kox_builder"
 
 # Create main and timestamped images
 buildah commit "$kox_builder" "ghcr.io/cam-rod/koxtoolchain:$TARGET-$KOX_VERSION"
-buildah commit "$kox_builder" "ghcr.io/cam-rod/koxtoolchain:$TARGET-latest"
+buildah tag "ghcr.io/cam-rod/koxtoolchain:$TARGET-$KOX_VERSION" "ghcr.io/cam-rod/koxtoolchain:$TARGET-latest"
 buildah rm "$kox_builder"

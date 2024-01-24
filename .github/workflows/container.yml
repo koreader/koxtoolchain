@@ -35,7 +35,7 @@ jobs:
       
       - name: Get latest release
         id: get-release
-        uses: ocktokit/request-action@v2.x
+        uses: octokit/request-action@v2.x
         with:
           route: GET /repos/{owner}/{repo}/releases/latest
           owner: koreader
