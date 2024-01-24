@@ -55,7 +55,6 @@ buildah config -a org.opencontainers.image.authors='Cameron Rodriguez <dev@camro
     "$kox_builder"
 
 # Create main and timestamped images
-buildah commit "$kox_builder" "ghcr.io/cam-rod/koxtoolchain:$TARGET-$KOX_VERSION-$(date -u +'%Y%m%d%H%M')"
 buildah commit "$kox_builder" "ghcr.io/cam-rod/koxtoolchain:$TARGET-$KOX_VERSION"
 buildah commit "$kox_builder" "ghcr.io/cam-rod/koxtoolchain:$TARGET-latest"
 buildah rm "$kox_builder"
