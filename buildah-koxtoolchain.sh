@@ -52,12 +52,12 @@ buildah config -a org.opencontainers.image.authors='Cameron Rodriguez <dev@camro
     -a org.opencontainers.image.title="koxtoolchain container" \
     -a org.opencontainers.image.description="Container image for KOReader cross-compile toolchain" \
     -a org.opencontainers.image.version="$KOX_VERSION" \
-    -a org.opencontainers.image.source="https://github.com/cam-rod/koxtoolchain/tree/container" \
+    -a org.opencontainers.image.source="https://github.com/koreader/koxtoolchain/tree/container" \
     -a org.opencontainers.image.licenses="AGPL-3.0-or-later" \
     --workingdir /home/kox/build \
     "$kox_builder"
 
 # Create main and timestamped images
-buildah commit "$kox_builder" "ghcr.io/cam-rod/koxtoolchain:$TARGET-$KOX_VERSION"
-buildah tag "ghcr.io/cam-rod/koxtoolchain:$TARGET-$KOX_VERSION" "ghcr.io/cam-rod/koxtoolchain:$TARGET-latest"
+buildah commit "$kox_builder" "ghcr.io/koreader/koxtoolchain:$TARGET-$KOX_VERSION"
+buildah tag "ghcr.io/koreader/koxtoolchain:$TARGET-$KOX_VERSION" "ghcr.io/koreader/koxtoolchain:$TARGET-latest"
 buildah rm "$kox_builder"
