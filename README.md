@@ -53,15 +53,15 @@ To use the containerized toolchain (for example, Kobo):
 
 ```bash
 podman pull ghcr.io/koreader/koxtoolchain:kobo-latest
-podman run --rm -it -v /home/user/src-folder:/home/kox/build \
-  koxtoolchain:kobo-latest <build_command>
+podman run --rm -it -v <source_folder>:/home/kox/build koxtoolchain:kobo-latest
+  
+kox@containerID$ <build_command>
 ```
 
-For systems with SELinux enforcing (ex. Fedora), use this command instead:
+For systems with SELinux enforcing (ex. Fedora), use this launch command instead:
 
 ```bash
-podman run --rm -it -v /home/user/src-folder:/home/kox/build:z \
-  koxtoolchain:kobo-latest <build_command>
+podman run --rm -it -v <source_folder>:/home/kox/build:z koxtoolchain:kobo-latest
 ```
 
 ## Notes

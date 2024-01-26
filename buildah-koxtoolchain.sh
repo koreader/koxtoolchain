@@ -29,12 +29,13 @@ kox_builder=$(buildah from --ulimit nofile=2048:2048 ubuntu:latest)
 buildah run -e DEBIAN_FRONTEND=noninteractive "$kox_builder" -- apt-get -y update
 buildah run -e DEBIAN_FRONTEND=noninteractive "$kox_builder" -- apt-get -y install build-essential autoconf automake \
     bison flex gawk libtool libtool-bin libncurses-dev curl file git gperf help2man texinfo unzip wget sudo
+buildah copy "$kox_builder" entrypoint.sh /entrypoint.sh
 
 # Create kox user (password: kox)
 buildah run "$kox_builder" -- useradd -G sudo kox
 buildah run "$kox_builder" -- bash -c 'echo "kox:kox" | chpasswd'
 buildah run "$kox_builder" -- mkdir -p /home/kox/build
-buildah config --workingdir /home/kox --entrypoint /bin/bash "$kox_builder"
+buildah config --workingdir /home/kox "$kox_builder"
 
 # Compile and install koxtoolchain
 buildah run "$kox_builder" -- git clone -b "$KOX_VERSION" "https://github.com/koreader/koxtoolchain.git" koxtoolchain
@@ -54,7 +55,7 @@ buildah config -a org.opencontainers.image.authors='Cameron Rodriguez <dev@camro
     -a org.opencontainers.image.version="$KOX_VERSION" \
     -a org.opencontainers.image.source="https://github.com/koreader/koxtoolchain/tree/container" \
     -a org.opencontainers.image.licenses="AGPL-3.0-or-later" \
-    --workingdir /home/kox/build \
+    --workingdir /home/kox/build -u root --entrypoint '["/bin/bash", "/entrypoint.sh"]' --cmd '/bin/bash' \
     "$kox_builder"
 
 # Create main and timestamped images
