@@ -1,0 +1,58 @@
+name: Container
+
+on:
+  release: 
+    types: [published]
+  workflow_dispatch: {}
+
+env:
+  REGISTRY_USER: ${{ github.actor }}
+  REGISTRY_PASSWORD: ${{ github.token }}
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        tc: [kindle, kindle5, kindlepw2, kobo, nickel, remarkable, cervantes, pocketbook, bookeen]
+    
+    steps:
+      - name: Check out Git repository
+        id: checkout-repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Log into GHCR
+        id: ghcr-login
+        uses: redhat-actions/podman-login@v1
+        with: 
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+      
+      - name: Get latest release
+        id: get-release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/{owner}/{repo}/releases/latest
+          owner: koreader
+          repo: koxtoolchain
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build images
+        id: build-images
+        run: ./buildah-koxtoolchain.sh ${{ matrix.tc }} ${{ fromJson(steps.get-release.outputs.data).tag_name }}
+          
+      - name: Push to ghcr.io
+        id: push-ghcr
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          registry: ghcr.io/${{ github.repository_owner }}
+          image: ${{ github.event.repository.name }}
+          tags: ${{ matrix.tc }}-latest ${{ matrix.tc }}-${{ fromJson(steps.get-release.outputs.data).tag_name }}
+          extra-args: |
+            --disable-content-trust

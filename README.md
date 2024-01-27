@@ -45,6 +45,25 @@ For example, for a Kobo TC:
 source refs/x-compile.sh kobo env
 ```
 
+## Container image
+
+You can also use a container with the precompiled toolchain. Pull the relevant image from the [GitHub Container Registry](https://ghcr.io/koreader/koxtoolchain). Alternatively, build the image locally using the [source script](./buildah-koxtoolchain.sh) (requires [Buildah](https://buildah.io/), run `./buildah-koxtoolchain.sh -h` for instructions).
+
+To use the containerized toolchain (for example, Kobo):
+
+```bash
+podman pull ghcr.io/koreader/koxtoolchain:kobo-latest
+podman run --rm -it -v <source_folder>:/home/kox/build koxtoolchain:kobo-latest
+  
+kox@containerID$ <build_command>
+```
+
+For systems with SELinux enforcing (ex. Fedora), use this launch command instead:
+
+```bash
+podman run --rm -it -v <source_folder>:/home/kox/build:z koxtoolchain:kobo-latest
+```
+
 ## Notes
 
 Due to a whole lot of legacy baggage, the names of the various Kindle TCs may be slightly confusing (especially compared to KOReader's target names), so, let's disambiguate that:
