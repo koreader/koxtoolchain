@@ -60,8 +60,7 @@ Build_CT-NG() {
 			unset CFLAGS CXXFLAGS LDFLAGS
 			ct-ng "${tc_target}"
 			ct-ng oldconfig
-			# That requires the 1.24 branch, so, don't do it on 1.23
-			[ ! -f "${BUILD_ROOT}/CT-NG/steps.mk" ] && ct-ng upgradeconfig
+			ct-ng upgradeconfig
 			ct-ng updatetools
 			nice ct-ng build
 			echo ""
