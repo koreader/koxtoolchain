@@ -2,11 +2,16 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 19006 2022-12-25 17:45:39Z NiLuJe $
+# $Id: x-compile.sh 19539 2024-09-27 21:57:23Z NiLuJe $
 #
 # kate: syntax bash;
 #
 ##
+
+# TODO: Split the actual build stages into dedicated per-project files (e.g., in a x-compile.d folder).
+#       Will make it easier to work on the updates, make counting steps trivial,
+#       and allow us to only ship the frontend in koxtoolchain, where the only thing that matters is the env setup.
+#       Setup ordering via a series file, and support an early abort when alredy built via a pkg.built file in the staging dir.
 
 ## Using CrossTool-NG (http://crosstool-ng.org/)
 SVN_ROOT="${HOME}/SVN"
@@ -341,17 +346,20 @@ case ${1} in
 	kindlepw2 | pw2 | PW2 )
 		KINDLE_TC="PW2"
 	;;
+	kindlehf | khf | KHF )
+		KINDLE_TC="KHF"
+	;;
 	kobo | Kobo | KOBO )
 		KINDLE_TC="KOBO"
 	;;
 	nickel | Nickel | NICKEL )
 		KINDLE_TC="NICKEL"
 	;;
-	kobomk7 | mk7 | Mk7 | MK7 )
-		KINDLE_TC="MK7"
+	kobov4 | kobomk7 | mk7 | Mk7 | MK7 )
+		KINDLE_TC="KOBOV4"
 	;;
-	kobomk8 | mk8 | Mk8 | MK8 )
-		KINDLE_TC="MK8"
+	kobov5 | kobomk8 | mk8 | Mk8 | MK8 )
+		KINDLE_TC="KOBOV5"
 	;;
 	remarkable | reMarkable | Remarkable )
 		KINDLE_TC="REMARKABLE"
@@ -712,12 +720,84 @@ case ${KINDLE_TC} in
 
 		DEVICE_USERSTORE="/mnt/us"
 	;;
-	KOBO | NICKEL | MK7 | MK8 )
+	KHF )
+		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb"
+		CROSS_TC="arm-kindlehf-linux-gnueabihf"
+		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
+
+		# Export it for our CMakeCross TC file
+		export CROSS_TC
+		export TC_BUILD_DIR
+
+		export CROSS_PREFIX="${CROSS_TC}-"
+		export PATH="${HOME}/x-tools/${CROSS_TC}/bin:${PATH}"
+
+		## NOTE: The new libstdc++ ABI might cause some issues if not handled on GCC >= 5.1 (cf. https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html), so, disable it...
+		##       Apparently, the vendor TC is still (at least in part) based on GCC 4.9.1, so, keep doing this...
+		if is_ver_gte "$(${CROSS_TC}-gcc -dumpversion)" "5.1" ; then
+			LEGACY_GLIBCXX_ABI="-D_GLIBCXX_USE_CXX11_ABI=0"
+			## NOTE: Like the FORTIFY stuff, this should *really* be in CPPFLAGS, but we have to contend with broken buildsystems that don't honor CPPFLAGS... So we go with the more ubiquitous CFLAGS instead ;/.
+		fi
+
+		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
+		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb"
+		## Here be dragons!
+		RICE_CFLAGS="-O3 -ffast-math -ftree-vectorize -funroll-loops ${ARCH_FLAGS} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
+
+		## NOTE: Check if LTO still horribly breaks some stuff...
+		## NOTE: See https://gcc.gnu.org/gcc-4.9/changes.html for the notes about building LTO-enabled static libraries... (gcc-ar/gcc-ranlib)
+		## NOTE: And see https://gcc.gnu.org/gcc-5/changes.html to rejoice because we don't have to care about broken build-systems with mismatched compile/link time flags anymore :).
+		export AR="${CROSS_TC}-gcc-ar"
+		export RANLIB="${CROSS_TC}-gcc-ranlib"
+		export NM="${CROSS_TC}-gcc-nm"
+		## NOTE: Also, BOLO for packages thant link with $(CC) $(LDFLAGS) (ie. without CFLAGS). This is BAD. One (dirty) workaround if you can't fix the package is to append CFLAGS to the end of LDFLAGS... :/
+		## NOTE: ... although GCC 5 should handle this in a transparent & sane manner, so, yay :).
+		#BASE_CFLAGS="${NOLTO_CFLAGS}"
+		export CFLAGS="${BASE_CFLAGS}"
+		export CXXFLAGS="${BASE_CFLAGS}"
+		# NOTE: Use -isystem instead of -I to make sure GMP doesn't do crazy stuff... (FIXME: -idirafter sounds more correct for our use-case, though...)
+		BASE_CPPFLAGS="-isystem${TC_BUILD_DIR}/include"
+		export CPPFLAGS="${BASE_CPPFLAGS}"
+		BASE_LDFLAGS="-L${TC_BUILD_DIR}/lib -Wl,-O1 -Wl,--as-needed"
+		# NOTE: Dirty LTO workaround (cf. earlier). All hell might break loose if we tweak CFLAGS for some packages...
+		#BASE_LDFLAGS="${BASE_CFLAGS} ${BASE_LDFLAGS}"
+		export LDFLAGS="${BASE_LDFLAGS}"
+
+		# NOTE: We're no longer using the gold linker by default...
+		# FIXME: Because for some mysterious reason, gold + LTO leads to an unconditional dynamic link against libgcc_s (uless -static-libgcc is passed, of course).
+		export CTNG_LD_IS="bfd"
+
+		## NOTE: We jump through terrible hoops to counteract libtool's stripping of 'unknown' or 'harmful' FLAGS... (cf. https://www.gnu.org/software/libtool/manual/html_node/Stripped-link-flags.html)
+		## That's a questionable behavior that is bound to screw up LTO in fun and interesting ways, at the very least on the performance aspect of things...
+		## Store those in the right format here, and apply patches or tricks to anything using libtool, because of course it's a syntax that gcc doesn't know about, so we can't simply put it in the global LDFLAGS.... -_-".
+		## And since autotools being autotools, it's used in various completely idiosyncratic ways, we can't always rely on simply overriding AM_LDFLAGS...
+		## NOTE: Hopefully, GCC 5's smarter LTO handling means we don't have to care about that anymore... :).
+		export XC_LINKTOOL_CFLAGS="-Wc,-ffast-math -Wc,-fomit-frame-pointer -Wc,-frename-registers -Wc,-fweb"
+
+		BASE_HACKDIR="${SVN_ROOT}/Configs/trunk/Kindle/PW2_Hacks"
+
+		# We always rely on the native pkg-config, with custom search paths
+		BASE_PKG_CONFIG="pkg-config"
+		export PKG_CONFIG="${BASE_PKG_CONFIG}"
+		BASE_PKG_CONFIG_LIBDIR="${TC_BUILD_DIR}/lib/pkgconfig"
+		export PKG_CONFIG_PATH=""
+		export PKG_CONFIG_LIBDIR="${BASE_PKG_CONFIG_LIBDIR}"
+
+		## CMake is hell.
+		export CMAKE="cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPTS_BASE_DIR}/CMakeCross.txt -DCMAKE_INSTALL_PREFIX=${TC_BUILD_DIR}"
+
+		DEVICE_USERSTORE="/mnt/us"
+	;;
+	KOBO | NICKEL | KOBOV4 | KOBOV5 )
 		case ${KINDLE_TC} in
-			MK8 )
-				ARCH_FLAGS="-march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb"
+			KOBOV5 )
+				# NOTE: We actually build the TC with -mcpu=cortex-a7, because cortex-a53 would switch to armv8-a, whereas our targets still use an armv7 software stack...
+				#       (The choice of using the A7 over the A9 stems both from the sunxi socs running on A7,
+				#       and the fact the A9 had an out-of-order pipeline, while both the A7 & A53 are in-order).
+				ARCH_FLAGS="-march=armv7-a -mtune=cortex-a53 -mfpu=neon -mfloat-abi=hard -mthumb"
 			;;
-			MK7 )
+			KOBOV4 )
+				# NOTE: The sunxi B300 SoCs *technically* run on A7...
 				ARCH_FLAGS="-march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard -mthumb"
 				## NOTE: The only difference between FSF GCC (https://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=refs/heads/releases/gcc-10) and Arm's branch (https://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=refs/vendors/ARM/heads/arm-10) is
 				##       https://gcc.gnu.org/git?p=gcc.git;a=commit;h=3b91aab15443ee150b2ba314a4b26645ce8d713b (e.g., https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80155).
@@ -744,12 +824,12 @@ case ${KINDLE_TC} in
 					TC_BUILD_DIR="${HOME}/Kobo/CrossTool/Build_${KINDLE_TC}/${CROSS_TC}/${CROSS_TC}/sysroot/usr"
 				fi
 			;;
-			MK7 )
-				CROSS_TC="arm-kobomk7-linux-gnueabihf"
+			KOBOV4 )
+				CROSS_TC="arm-kobov4-linux-gnueabihf"
 				TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 			;;
-			MK8 )
-				CROSS_TC="arm-kobomk8-linux-gnueabihf"
+			KOBOV5 )
+				CROSS_TC="arm-kobov5-linux-gnueabihf"
 				TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 			;;
 		esac
@@ -765,11 +845,18 @@ case ${KINDLE_TC} in
 			export PATH="${HOME}/x-tools/${CROSS_TC}/bin:${PATH}"
 		fi
 
-		## NOTE: The new libstdc++ ABI might cause some issues if not handled on GCC >= 5.1 (cf. https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html), so, disable it...
-		if is_ver_gte "$(${CROSS_TC}-gcc -dumpversion)" "5.1" ; then
-			LEGACY_GLIBCXX_ABI="-D_GLIBCXX_USE_CXX11_ABI=0"
-			## NOTE: Like the FORTIFY stuff, this should *really* be in CPPFLAGS, but we have to contend with broken buildsystems that don't honor CPPFLAGS... So we go with the more ubiquitous CFLAGS instead ;/.
-		fi
+		case ${KINDLE_TC} in
+			KOBOV5 )
+				## Vendor TC is using GCC 11.3, so we don't have to jump through any shitty hoops.
+				;;
+			*)
+				## NOTE: The new libstdc++ ABI might cause some issues if not handled on GCC >= 5.1 (cf. https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html), so, disable it...
+				if is_ver_gte "$(${CROSS_TC}-gcc -dumpversion)" "5.1" ; then
+					LEGACY_GLIBCXX_ABI="-D_GLIBCXX_USE_CXX11_ABI=0"
+					## NOTE: Like the FORTIFY stuff, this should *really* be in CPPFLAGS, but we have to contend with broken buildsystems that don't honor CPPFLAGS... So we go with the more ubiquitous CFLAGS instead ;/.
+				fi
+			;;
+		esac
 
 		BASE_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb -flto=${AUTO_JOBS} -fuse-linker-plugin"
 		NOLTO_CFLAGS="-O3 -ffast-math ${ARCH_FLAGS} ${LEGACY_GLIBCXX_ABI} -pipe -fomit-frame-pointer -frename-registers -fweb"
@@ -3058,7 +3145,6 @@ update_title_info
 if [[ "${KINDLE_TC}" == "K3" ]] ; then
 	make ${JOBSFLAGS} legacy
 	cp Release/fbink ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbink
-	make clean
 	make ${JOBSFLAGS} fbdepth KINDLE=1 LEGACY=1
 	cp Release/fbdepth ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbdepth
 	make clean
@@ -3073,7 +3159,6 @@ if [[ "${KINDLE_TC}" == "K3" ]] ; then
 elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] ; then
 	make ${JOBSFLAGS} kindle
 	cp Release/fbink ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbink
-	make clean
 	make ${JOBSFLAGS} fbdepth KINDLE=1
 	cp Release/fbdepth ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbdepth
 	make clean
@@ -3088,7 +3173,6 @@ elif [[ "${KINDLE_TC}" == "K5" ]] || [[ "${KINDLE_TC}" == "PW2" ]] ; then
 else
 	make ${JOBSFLAGS} strip
 	cp Release/fbink ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbink
-	make clean
 	make ${JOBSFLAGS} fbdepth
 	cp Release/fbdepth ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/fbdepth
 	make clean
@@ -5161,7 +5245,7 @@ elif [[ "${KINDLE_TC}" == "K5" ]] ; then
 	asrc="${ksrc}/arch/arm/include"
 elif [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 	# NOTE: Use the most recent kernel available, and feed it FBInk's franken mxcfb/sunxi headers to handle backward compatibility.
-	ksrc="${HOME}/Kindle/SourceCode_Packages/Kobo-Sage/kernel"
+	ksrc="${HOME}/Kindle/SourceCode_Packages/Kobo-Elipsa2E/kernel/linux/v4.9"
 	asrc="${ksrc}/arch/arm/include"
 else
 	# NOTE: https://kindle.s3.amazonaws.com/Kindle_src_3.4.2_2687240004.tar.gz
@@ -5215,9 +5299,11 @@ else
 	if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
 		# Rely on our franken headers to support the full lineup...
 		wget "https://raw.githubusercontent.com/NiLuJe/FBInk/master/eink/mxcfb-kobo.h" -O src/linux/mxcfb-kobo.h
-		# NOTE: We need this to be visible to ioctls_gen for the sym pass
+		wget "https://raw.githubusercontent.com/NiLuJe/FBInk/master/eink/mtk-kobo.h" -O src/linux/mtk-kobo.h
+		# NOTE: We need these to be visible to ioctls_gen for the sym pass
 		#       (sunxi only requires an hex pass, which we force in the below patch)...
 		cp -av src/linux/mxcfb-kobo.h ${ksrc}/include/linux/mxcfb-kobo.h
+		cp -av src/linux/mtk-kobo.h ${ksrc}/include/linux/mtk-kobo.h
 		wget "https://raw.githubusercontent.com/NiLuJe/FBInk/master/eink/sunxi-kobo.h" -O src/linux/sunxi-kobo.h
 		wget "https://raw.githubusercontent.com/NiLuJe/FBInk/master/eink/ion-kobo.h" -O src/linux/ion-kobo.h
 		patch -p1 < ${SVN_ROOT}/Configs/trunk/Kindle/Misc/strace-ioctls_sym-tweaks-kobo.patch
@@ -6235,6 +6321,9 @@ make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" NO_PYTHON=1 NO_VA
 make ${JOBSFLAGS} CC="${CROSS_TC}-gcc" AR="${CROSS_TC}-gcc-ar" NO_PYTHON=1 NO_VALGRIND=1 NO_YAML=1 V=1 PREFIX="/" LIBDIR="\$(PREFIX)/lib" DESTDIR="${TC_BUILD_DIR}" install
 ${CROSS_TC}-strip --strip-unneeded ../bin/dtc
 cp ../bin/dtc ${BASE_HACKDIR}/USBNetwork/src/usbnet/bin/dtc
+
+# TODO: Ship squashfs-tools on Kindle 5.x
+# TODO: Ship https://github.com/linux-usb-gadgets/libusbgx on Kobo
 
 ## NOTE: We don't actually ship any of that, because userland (and kernel in most cases) is too old to make proper use of it :(
 if [[ "${KINDLE_TC}" == "KOBO" ]] ; then
