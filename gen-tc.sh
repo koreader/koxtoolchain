@@ -1,8 +1,8 @@
 #!/bin/bash -e
 #
-# adapted from NiLuJe's build script:
+# Adapted from NiLuJe's build script:
 # http://www.mobileread.com/forums/showthread.php?t=88004
-# (live copy: http://trac.ak-team.com/trac/browser/niluje/Configs/trunk/Kindle/Misc/x-compile.sh)
+# (live copy: https://svn.ak-team.com/svn/Configs/trunk/Kindle/Misc/x-compile.sh)
 #
 # =================== original header ====================
 #
@@ -87,7 +87,10 @@ Supported platforms:
 	kindle
 	kindle5
 	kindlepw2
+	kindlehf
 	kobo
+	kobov4
+	kobov5
 	nickel
 	remarkable
 	cervantes
@@ -106,65 +109,77 @@ case $1 in
 		echo "${HELP_MSG}"
 		exit 0
 		;;
+	kobov5)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
+			"arm-${1}-linux-gnueabihf"
+		;;
+	kobov4)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
+			"arm-${1}-linux-gnueabihf"
+		;;
 	kobo)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
+			"arm-${1}-linux-gnueabihf"
+		;;
+	kindlehf)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
-		# NOTE: Don't swap away from the 1.23-kindle branch,
-		#       this TC currently fails to build on 1.24-kindle...
-
 		# NOTE: Prevent libstdc++ from pulling in utimensat@GLIBC_2.6
 		export glibcxx_cv_utimensat=no
 
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d37d41bb205186cb38516445b2f1f502685cd77b \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabi"
 		unset glibcxx_cv_utimensat
 		;;
 	remarkable)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	cervantes)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
-		# NOTE: Don't swap away from the 1.23-kindle branch,
-		#       this TC currently fails to build on 1.24-kindle...
-
 		# NOTE: Prevent libstdc++ from pulling in utimensat@GLIBC_2.6
 		export glibcxx_cv_utimensat=no
 
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			d37d41bb205186cb38516445b2f1f502685cd77b \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabi"
 		# Then, pull InkView from the (old) official SDK...
 		# NOTE: See also https://github.com/pocketbook/SDK_6.3.0/tree/5.19/SDK-iMX6/usr/arm-obreey-linux-gnueabi/sysroot/usr/local for newer FWs...
@@ -209,7 +224,7 @@ case $1 in
 	bookeen)
 		Build_CT-NG \
 			https://github.com/NiLuJe/crosstool-ng.git \
-			a01c29cd09bff34ec9913c41cb850fb9a61c3bf2 \
+			e558dadb1a23bfaa9839b1a0f9ac42af8e1ab697 \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
