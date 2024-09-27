@@ -35,7 +35,7 @@ For example, to build a cross toolchain for legacy non-touch kindle devices, typ
 ./gen-tc.sh kindle
 ```
 
-You can use `./gen-tc.sh -h` to get a list of supported platforms.
+You can use `./gen-tc.sh -h` to get a list of supported platforms (some of which may not have a matching KOReader target, either because a port was never finished (e.g., `bookeen`), or they're just minor variants for evolving platforms where KOReader prefers to keep backwards compatibility intact (e.g., `kobov4`)).
 
 After the build is finished, you should be able to find your cross ToolChains under the `~/x-tools` directory.
 
@@ -73,10 +73,13 @@ Due to a whole lot of legacy baggage, the names of the various Kindle TCs may be
 |   kindle  |      Kindle 2, DX, DXg, 3     | kindle-legacy |
 |  kindle5  |      Kindle 4, Touch, PW1     |     kindle    |
 | kindlepw2 | Kindle PW2 & everything since |   kindlepw2   |
+|  kindlehf |   Any Kindle on FW >= 5.16.3  |    kindlehf   |
 
 No such worries on Kobo & Cervantes, though ;).  
 
 The nickel TC is a Kobo variant that mimics Kobo's own TC (as of FW >= 4.6). It is *not* recommended for general purpose stuff, only use it if you have a specific need for it (which should essentially be limited to working with Kobo's nickel, or Kobo's kernels).
+
+The kobov5 TC is specifically tailored for Kobo & Tolino devices running on FW 5.x. Since that FW implies packaging differences compared to earlier iterations, it does warrant a dedicated KOReader target. (It also targets a *much* more recent glibc version).
 
 The pocketbook TC aims for maximum backward compatibility while still keeping inkview support.
 
