@@ -2,7 +2,7 @@
 #
 # Kindle cross toolchain & lib/bin/util build script
 #
-# $Id: x-compile.sh 19539 2024-09-27 21:57:23Z NiLuJe $
+# $Id: x-compile.sh 19545 2024-09-28 23:41:02Z NiLuJe $
 #
 # kate: syntax bash;
 #
@@ -107,61 +107,8 @@ update_title_info()
 }
 
 ## Install/Setup CrossTool-NG
-Build_CT-NG-Legacy() {
-	echo "* Building CrossTool-NG 1.23 . . ."
-	echo ""
-	cd ${HOME}/Kindle
-	mkdir -p CrossTool
-	cd CrossTool
-
-	# Remove previous CT-NG install...
-	rm -rf CT-NG
-
-	mkdir -p CT-NG
-	cd CT-NG
-	# Pull our own CT-NG branch, which includes a few tweaks needed to support truly old glibc & kernel versions...
-	git clone -b 1.23-kindle --single-branch https://github.com/NiLuJe/crosstool-ng.git .
-
-	git clean -fxdq
-	./bootstrap
-	./configure --enable-local
-	make -j$(nproc)
-
-	# We need a clean set of *FLAGS, or shit happens...
-	unset CFLAGS CXXFLAGS LDFLAGS
-
-	## And then build every TC one after the other...
-	for my_tc in kindle pocketbook ; do
-		echo ""
-		echo "* Building the ${my_tc} ToolChain . . ."
-		echo ""
-
-		# Start by removing the old TC...
-		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi
-		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabihf
-		# Then backup the current one...
-		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabi" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabi
-		[[ -d "${HOME}/x-tools/arm-${my_tc}-linux-gnueabihf" ]] && mv ${HOME}/x-tools/{,_}arm-${my_tc}-linux-gnueabihf
-
-		# Clean the WD
-		./ct-ng clean
-
-		# Build the config from this TC's sample
-		./ct-ng $(find samples -type d -name "arm-${my_tc}-linux-gnueabi*" | cut -d'/' -f2)
-
-		# And fire away!
-		./ct-ng oldconfig
-		#./ct-ng menuconfig
-
-		./ct-ng updatetools
-
-		nice ./ct-ng build
-	done
-}
-
-## Install/Setup CrossTool-NG
 Build_CT-NG() {
-	echo "* Building CrossTool-NG 1.24 . . ."
+	echo "* Building CrossTool-NG . . ."
 	echo ""
 	cd ${HOME}/Kindle
 	mkdir -p CrossTool
@@ -173,7 +120,7 @@ Build_CT-NG() {
 	mkdir -p CT-NG
 	cd CT-NG
 	# Pull our own CT-NG branch, which includes a few tweaks needed to support truly old glibc & kernel versions...
-	git clone -b 1.24-kindle --single-branch https://github.com/NiLuJe/crosstool-ng.git .
+	git clone -b 1.26-koreader --single-branch https://github.com/NiLuJe/crosstool-ng.git .
 	# This also often includes the latest Linaro GCC versions...
 	# But, more generally,
 	# This includes the Make-3.82 patch to Glibc 2.9 too, because it fails to build in softfp with make 3.81... -_-" [Cf. http://lists.gnu.org/archive/html/help-make/2012-02/msg00025.html]
@@ -224,11 +171,15 @@ Build_CT-NG() {
 	unset CFLAGS CXXFLAGS LDFLAGS
 
 	## And then build every TC one after the other...
-	## FIXME: kindle & pocketbook are broken in the 1.24 branch (The pass-2 core C gcc compiler fails to build libgcc with a multiple definition of `__libc_use_alloca' link failure), for some reason (they both use the same ridiculously old glibc version)...
-	for my_tc in kindle5 kindlepw2 kobo remarkable bookeen cervantes ; do
+	for my_tc in kindle kindle5 kindlepw2 kindlehf kobo kobov4 kobov5 remarkable pocketbook bookeen cervantes ; do
 		echo ""
 		echo "* Building the ${my_tc} ToolChain . . ."
 		echo ""
+
+		if [[ "${my_tc}" == "kindle" ]] || [[ "${my_tc}" == "pocketbook" ]]; then
+			# NOTE: Prevent libstdc++ from pulling in utimensat@GLIBC_2.6
+			export glibcxx_cv_utimensat=no
+		fi
 
 		# Start by removing the old TC...
 		[[ -d "${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi" ]] && chmod -R u+w ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi && rm -rf ${HOME}/x-tools/_arm-${my_tc}-linux-gnueabi
@@ -251,6 +202,10 @@ Build_CT-NG() {
 		./ct-ng updatetools
 
 		nice ./ct-ng build
+
+		if [[ -n "${glibcxx_cv_utimensat}" ]]; then
+			unset glibcxx_cv_utimensat
+		fi
 	done
 
 	## NOTE: Do that ourselves?
@@ -349,6 +304,9 @@ case ${1} in
 	kindlehf | khf | KHF )
 		KINDLE_TC="KHF"
 	;;
+	cervantes )
+		KINDLE_TC="CERVANTES"
+	;;
 	kobo | Kobo | KOBO )
 		KINDLE_TC="KOBO"
 	;;
@@ -372,13 +330,12 @@ case ${1} in
 	;;
 	# Or build them?
 	tc )
-		Build_CT-NG-Legacy
 		Build_CT-NG
 		# And exit happy now :)
 		exit 0
 	;;
 	* )
-		echo "You must choose a ToolChain! (k3, k5, pw2, kobo, mk7, nickel, remarkable, pocketbook or bookeen)"
+		echo "You must choose a ToolChain! (k3, k5, pw2, khf, kobo, kobov4, kobov5, nickel, remarkable, pocketbook or bookeen)"
 		echo "Or, alternatively, ask to build them (tc)"
 		exit 1
 	;;
@@ -788,7 +745,7 @@ case ${KINDLE_TC} in
 
 		DEVICE_USERSTORE="/mnt/us"
 	;;
-	KOBO | NICKEL | KOBOV4 | KOBOV5 )
+	KOBO | NICKEL | KOBOV4 | KOBOV5 | CERVANTES )
 		case ${KINDLE_TC} in
 			KOBOV5 )
 				# NOTE: We actually build the TC with -mcpu=cortex-a7, because cortex-a53 would switch to armv8-a, whereas our targets still use an armv7 software stack...
@@ -804,6 +761,11 @@ case ${KINDLE_TC} in
 				##       If we wanted to mimic that, since we actually build against FSF GCC, we could disable code-hoisting here. Doesn't really seem to help us in practice though, so, eh.
 				#ARCH_FLAGS="${ARCH_FLAGS} -fno-code-hoisting"
 				## NOTE: As for defaulting to Thumb mode, that's consistent with Linaro's default armv7 configs.
+			;;
+			CERVANTES )
+				# NOTE: Not quite sure why this is using vfpv3 with a TC built with -mcpu=cortex-a8...
+				#       But I'm not the one that came up with it, so, follow what's done in KOReader (which, technically, even downgrades -mtune to generic-armv7-a).
+				ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=vfpv3 -mfloat-abi=softfp -mthumb"
 			;;
 			* )
 				ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb"
@@ -830,6 +792,10 @@ case ${KINDLE_TC} in
 			;;
 			KOBOV5 )
 				CROSS_TC="arm-kobov5-linux-gnueabihf"
+				TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
+			;;
+			CERVANTES )
+				CROSS_TC="arm-cervantes-linux-gnueabi"
 				TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 			;;
 		esac
@@ -1013,6 +979,7 @@ case ${KINDLE_TC} in
 	PB )
 		# NOTE: The TC itself is built in ARM mode, otherwise glibc 2.9 doesn't build (fails with a "r15 not allowed here" assembler error on csu/libc-start.o during the early multilib start-files step).
 		#       AFAICT, the official SDK doesn't make a specific choice on that front (i.e., it passes neither -marm not -mthumb. That usually means ARM)...
+		# NOTE: This is probably related to our choice of -mcpu target, as the kindle TC builds just fine on the same glibc version... for armv6j ;).
 		ARCH_FLAGS="-march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp -mthumb"
 		CROSS_TC="arm-pocketbook-linux-gnueabi"
 		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
@@ -1185,14 +1152,11 @@ if [[ "${2}" == "env" ]] ; then
 		export CXXFLAGS="${RICE_CFLAGS}"
 		# NOTE: In the same vein, disable gold too...
 		unset CTNG_LD_IS
-		# NOTE: And we want to link to libstdc++ statically...
-		export LDFLAGS="${LDFLAGS} -static-libstdc++"
-
-		# XXX: Go back to GCC 4.9 for now, as CRe mysteriously breaks when built w/ Linaro GCC 5.2 2015.11-2...
-		# NOTE: Now fixed in CRe ;).
-		#export PATH="${PATH/${CROSS_TC}/gcc49_${CROSS_TC}}"
-		# XXX: Oh, joy. It also segfaults w/ Linaro GCC 4.9 2016.02...
-		# NOTE: Because that was during the great 2016 snapshot breakening! :D
+		# We ship our own shared STL, no need to downgrade the ABI
+		if [[ -n "${LEGACY_GLIBCXX_ABI}" ]]; then
+			export CFLAGS="${CFLAGS/${LEGACY_GLIBCXX_ABI}/}"
+			export CXXFLAGS="${CXXFLAGS/${LEGACY_GLIBCXX_ABI}/}"
+		fi
 	# As well as a no-sysroot version for standalone projects (i.e., KFMon)
 	elif [[ "${3}" == "bare" ]] ; then
 		echo "* Not using our custom sysroot! :)"
