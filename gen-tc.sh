@@ -171,7 +171,7 @@ case $1 in
     Build_CT-NG \
       https://github.com/NoaHimesaka1873/crosstool-ng.git \
       22365cbbb917d6f389c77ccdf12602cd8e147cf1 \
-      "aarch64-${1}-linux-gnu"
+      "aarch64-remarkable-linux-gnu"
     ;;
 	cervantes)
 		Build_CT-NG \
