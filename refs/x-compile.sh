@@ -51,9 +51,9 @@ case ${1} in
 	;;
 	remarkable | reMarkable | Remarkable )
 		KINDLE_TC="REMARKABLE"
-  ;;
-  remarkable-aarch64 )
-    KINDLE_TC="REMARKABLE_AARCH64"
+	;;
+	remarkable-aarch64 )
+		KINDLE_TC="REMARKABLE_AARCH64"
 	;;
 	pocketbook | pb | PB )
 		KINDLE_TC="PB"
@@ -628,7 +628,7 @@ case ${KINDLE_TC} in
 
 		DEVICE_USERSTORE="/home/root"
 	;;
-  REMARKABLE_AARCH64 )
+	REMARKABLE_AARCH64 )
 		ARCH_FLAGS="-mcpu=coretex-a53 -march=armv8-a+crc+crypto"
 		CROSS_TC="aarch64-remarkable-linux-gnu"
 		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
