@@ -170,7 +170,7 @@ case $1 in
   remarkable-aarch64)
     Build_CT-NG \
       https://github.com/NoaHimesaka1873/crosstool-ng.git \
-      22365cbbb917d6f389c77ccdf12602cd8e147cf1 \
+      9ac7de1e6191875bbe86ff785aba398feed0b9f3 \
       "aarch64-remarkable-linux-gnu"
     ;;
 	cervantes)
