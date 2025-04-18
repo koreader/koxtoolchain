@@ -629,7 +629,7 @@ case ${KINDLE_TC} in
 		DEVICE_USERSTORE="/home/root"
 	;;
 	REMARKABLE_AARCH64 )
-		ARCH_FLAGS="-mcpu=coretex-a53 -march=armv8-a+crc+crypto"
+		ARCH_FLAGS="-march=armv8-a+crc+crypto -mtune=cortex-a53"
 		CROSS_TC="aarch64-remarkable-linux-gnu"
 		TC_BUILD_DIR="${HOME}/Kindle/CrossTool/Build_${KINDLE_TC}"
 
@@ -677,7 +677,7 @@ case ${KINDLE_TC} in
 		## NOTE: Hopefully, GCC 5's smarter LTO handling means we don't have to care about that anymore... :).
 		export XC_LINKTOOL_CFLAGS="-Wc,-ffast-math -Wc,-fomit-frame-pointer -Wc,-frename-registers -Wc,-fweb"
 
-		BASE_HACKDIR="${SVN_ROOT}/Configs/trunk/Kindle/reMarkable_Hacks"
+		BASE_HACKDIR="${SVN_ROOT}/Configs/trunk/Kindle/rM_aarch64_Hacks"
 
 		# We always rely on the native pkg-config, with custom search paths
 		BASE_PKG_CONFIG="pkg-config"
