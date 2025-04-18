@@ -92,6 +92,7 @@ Supported platforms:
 	kobov5
 	nickel
 	remarkable
+	remarkable-aarch64
 	cervantes
 	pocketbook
 	bookeen
@@ -165,6 +166,12 @@ case $1 in
 			https://github.com/NiLuJe/crosstool-ng.git \
 			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
 			"arm-${1}-linux-gnueabihf"
+		;;
+	remarkable-aarch64)
+		Build_CT-NG \
+			https://github.com/NiLuJe/crosstool-ng.git \
+			9d4156d109d22e9b0e8958e56bbbd947cd7ce065 \
+			"aarch64-remarkable-linux-gnu"
 		;;
 	cervantes)
 		Build_CT-NG \
