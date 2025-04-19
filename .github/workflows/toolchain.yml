@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        tc: [kindle, kindle5, kindlepw2, kindlehf, kobo, kobov4, kobov5, nickel, remarkable, cervantes, pocketbook, bookeen]
+        tc: [kindle, kindle5, kindlepw2, kindlehf, kobo, kobov4, kobov5, nickel, remarkable, remarkable-aarch64, cervantes, pocketbook, bookeen]
 
     steps:
       - name: Check out Git repository
