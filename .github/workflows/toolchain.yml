@@ -8,7 +8,9 @@ on: [push, pull_request]
 
 jobs:
   toolchain:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    container:
+      image: koreader/kobase:0.4.0-22.04
 
     strategy:
       fail-fast: false
@@ -16,18 +18,20 @@ jobs:
         tc: [kindle, kindle5, kindlepw2, kindlehf, kobo, kobov4, kobov5, nickel, remarkable, remarkable-aarch64, cervantes, pocketbook, bookeen]
 
     steps:
-      - name: Check out Git repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Deps
-        run:  sudo apt-get install build-essential autoconf automake bison flex gawk libtool libtool-bin libncurses-dev curl file git gperf help2man texinfo unzip wget
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y bison flex gawk gperf help2man libncurses-dev libtool-bin rsync texinfo
 
-      - name: gen-tc
+      - name: Generate toolchain
         run: ./gen-tc.sh ${{ matrix.tc }}
 
-      - name: tar
+      - name: Tar artifacts
         run: tar -C ~ -czf ${{ matrix.tc }}.tar.gz x-tools
 
       - name: Uploading artifacts
