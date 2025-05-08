@@ -62,6 +62,9 @@ Build_CT-NG() {
 			ct-ng oldconfig
 			ct-ng upgradeconfig
 			ct-ng updatetools
+			if [ -n "${CI}" ]; then
+				sed -i 's/^CT_LOG_PROGRESS_BAR=y/CT_LOG_PROGRESS_BAR=n/' .config
+			fi
 			nice ct-ng build
 			echo ""
 			echo "[INFO ]  ================================================================="
