@@ -54,18 +54,24 @@ Build_CT-NG() {
 		tmp_str="${tc_target#*-}"
 		TC_BUILD_DIR="${tmp_str%%-*}"
 		[ ! -d "${TC_BUILD_DIR}" ] && mkdir -p "${TC_BUILD_DIR}"
+		ct_ng=(
+			ct-ng
+			# Tweak curl / wget options for better feedback (particularly on error).
+			curl_silent_opt=''
+			wget_silent_opt='--progress=dot:mega'
+		)
 		pushd "${TC_BUILD_DIR}"
-			ct-ng distclean
+			"${ct_ng[@]}" distclean
 
 			unset CFLAGS CXXFLAGS LDFLAGS
-			ct-ng "${tc_target}"
-			ct-ng oldconfig
-			ct-ng upgradeconfig
-			ct-ng updatetools
+			"${ct_ng[@]}" "${tc_target}"
+			"${ct_ng[@]}" oldconfig
+			"${ct_ng[@]}" upgradeconfig
+			"${ct_ng[@]}" updatetools
 			if [ -n "${CI}" ]; then
 				sed -i 's/^CT_LOG_PROGRESS_BAR=y/CT_LOG_PROGRESS_BAR=n/' .config
 			fi
-			nice ct-ng build
+			nice "${ct_ng[@]}" build
 			echo ""
 			echo "[INFO ]  ================================================================="
 			echo "[INFO ]  Build done. Please add $HOME/x-tools/${tc_target}/bin to your PATH."
