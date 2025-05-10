@@ -7,7 +7,9 @@ concurrency:
 on: [push, pull_request]
 
 jobs:
+
   toolchain:
+
     runs-on: ubuntu-latest
     container:
       image: koreader/kobase:0.4.0-22.04
@@ -21,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Install deps
         run: |
@@ -34,8 +36,44 @@ jobs:
       - name: Tar artifacts
         run: tar -C ~ -czf ${{ matrix.tc }}.tar.gz x-tools
 
-      - name: Uploading artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.tc }}
           path: ${{ matrix.tc }}.tar.gz
+
+  release:
+
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    needs: toolchain
+
+    runs-on: ubuntu-latest
+
+    permissions:
+        contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: artifacts
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if release already exists.
+          gh release list --json name,tagName,isDraft,createdAt,publishedAt | jq --color-output --exit-status --raw-output '.[] | select(.tagName == "${{ github.ref_name }}") | if .tagName == "" then halt_error end' ||
+          # And create it if it does not.
+          gh release create '${{ github.ref_name }}' --draft --notes-file .github/default_release_notes.md --title 'koxtoolchain ${{ github.ref_name }}' --verify-tag
+
+      - name: Upload release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ github.ref_name }}' artifacts/* --clobber
