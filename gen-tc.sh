@@ -67,7 +67,6 @@ Build_CT-NG() {
 			"${ct_ng[@]}" "${tc_target}"
 			"${ct_ng[@]}" oldconfig
 			"${ct_ng[@]}" upgradeconfig
-			"${ct_ng[@]}" updatetools
 			if [ -n "${CI}" ]; then
 				sed -i 's/^CT_LOG_PROGRESS_BAR=y/CT_LOG_PROGRESS_BAR=n/' .config
 			fi
