@@ -97,14 +97,14 @@ jobs:
           key: ${{ steps.cache-restore.outputs.cache-primary-key }}
 
       - name: Tar artifacts
-        run: tar -C ~ -czf ${{ matrix.tc }}.tar.gz x-tools
+        run: tar -C ~ -caf ${{ matrix.tc }}.tar.zst x-tools
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
           archive: false
           name: ${{ matrix.tc }}
-          path: ${{ matrix.tc }}.tar.gz
+          path: ${{ matrix.tc }}.tar.zst
 
   release:
 
