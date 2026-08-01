@@ -17,7 +17,8 @@
 
 CUR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_ROOT="${CUR_DIR}/build"
-DEFAULT_GIT_REPO="https://github.com/crosstool-ng/crosstool-ng.git"
+DEFAULT_GIT_REPO='https://github.com/benoit-pierre/crosstool-ng.git'
+DEFAULT_GIT_REV='34844bc8e985ad1ba26b072a5b58264967072e19'
 
 Build_CT-NG() {
 	echo "[*] Building CrossTool-NG . . ."
@@ -119,44 +120,44 @@ case $1 in
 		;;
 	kobov5)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kobov4)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kobo)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	nickel)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlehf)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	kindlepw2)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle5)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		;;
 	kindle)
@@ -164,42 +165,42 @@ case $1 in
 		export glibcxx_cv_utimensat=no
 
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		unset glibcxx_cv_utimensat
 		;;
 	remarkable)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabihf"
 		;;
 	remarkable-aarch64)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			9d4156d109d22e9b0e8958e56bbbd947cd7ce065 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"aarch64-remarkable-linux-gnu"
 		;;
 	cervantes)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		;;
 	pocketbook)
 		# NOTE: Prevent libstdc++ from pulling in utimensat@GLIBC_2.6
 		export glibcxx_cv_utimensat=no
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		unset glibcxx_cv_utimensat
 		;;
 	bookeen)
 		Build_CT-NG \
-			https://github.com/NiLuJe/crosstool-ng.git \
-			62fb5946719c24dd38c1f41a35a7f8bdf35462d6 \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		;;
 	*)
