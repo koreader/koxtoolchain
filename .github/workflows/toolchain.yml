@@ -12,7 +12,7 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: koreader/kobase:0.4.0-22.04
+      image: koreader/kobase:2.0.0-22.04
 
     strategy:
       fail-fast: false
