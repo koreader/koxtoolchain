@@ -17,7 +17,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tc: [kindle, kindle5, kindlepw2, kindlehf, kobo, kobov4, kobov5, nickel, remarkable, remarkable-aarch64, cervantes, pocketbook, bookeen]
+        tc: [
+          bookeen,
+          cervantes,
+          kindle,
+          kindle5,
+          kindlehf,
+          kindlepw2,
+          kobo,
+          kobov4,
+          kobov5,
+          nickel,
+          pocketbook,
+          remarkable,
+          remarkable-aarch64,
+        ]
 
     steps:
       - name: Checkout repository
