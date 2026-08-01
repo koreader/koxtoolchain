@@ -104,6 +104,7 @@ Supported platforms:
 	remarkable-aarch64
 	cervantes
 	pocketbook
+	pocketbookhf
 	bookeen
 "
 
@@ -196,6 +197,12 @@ case $1 in
 			"$DEFAULT_GIT_REV" \
 			"arm-${1}-linux-gnueabi"
 		unset glibcxx_cv_utimensat
+		;;
+	pocketbookhf)
+		Build_CT-NG \
+			"$DEFAULT_GIT_REPO" \
+			"$DEFAULT_GIT_REV" \
+			"arm-${1}-linux-gnueabihf"
 		;;
 	bookeen)
 		Build_CT-NG \
