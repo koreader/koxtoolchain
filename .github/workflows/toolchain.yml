@@ -33,6 +33,7 @@ jobs:
           kobov5,
           nickel,
           pocketbook,
+          pocketbookhf,
           remarkable,
           remarkable-aarch64,
         ]
